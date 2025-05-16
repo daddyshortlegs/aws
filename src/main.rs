@@ -7,6 +7,8 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use tower_http::cors::{CorsLayer, Any};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+use tokio::process::Command;
+use std::path::PathBuf;
 
 #[derive(Debug, Serialize, Deserialize)]
 struct LaunchVmRequest {
@@ -25,15 +27,43 @@ struct LaunchVmResponse {
 async fn launch_vm(
     Json(payload): Json<LaunchVmRequest>,
 ) -> (StatusCode, Json<LaunchVmResponse>) {
-    // Here you would implement the actual VM launch logic
-    // For now, we'll just return a mock response
-    let response = LaunchVmResponse {
-        success: true,
-        message: format!("VM launch request received for {} in {}", payload.name, payload.region),
-        instance_id: Some("i-1234567890abcdef0".to_string()),
-    };
+    // Get the current directory path
+    let current_dir = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+    let iso_path = current_dir.join("linuxmint-22.1-cinnamon-64bit.iso");
+    let qcow2_path = current_dir.join("mint.qcow2");
 
-    (StatusCode::OK, Json(response))
+    // Execute QEMU command
+    let output = Command::new("qemu-system-x86_64")
+        .args([
+            "-m", "8192",
+            "-smp", "2",
+            "-cdrom", iso_path.to_str().unwrap(),
+            "-drive", &format!("file={}", qcow2_path.to_str().unwrap()),
+            "-boot", "d",
+            "-vga", "virtio",
+            "-net", "nic",
+            "-net", "user"
+        ])
+        .spawn();
+
+    match output {
+        Ok(_) => {
+            let response = LaunchVmResponse {
+                success: true,
+                message: format!("VM launch request received for {} in {}", payload.name, payload.region),
+                instance_id: Some("qemu-instance".to_string()),
+            };
+            (StatusCode::OK, Json(response))
+        }
+        Err(e) => {
+            let response = LaunchVmResponse {
+                success: false,
+                message: format!("Failed to launch VM: {}", e),
+                instance_id: None,
+            };
+            (StatusCode::INTERNAL_SERVER_ERROR, Json(response))
+        }
+    }
 }
 
 #[tokio::main]

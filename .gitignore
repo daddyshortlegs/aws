@@ -24,3 +24,5 @@ Cargo.lock
 
 # Debug files
 *.log 
+*.iso
+*.qcow2
