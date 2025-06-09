@@ -29,20 +29,18 @@ async fn launch_vm(
 ) -> (StatusCode, Json<LaunchVmResponse>) {
     // Get the current directory path
     let current_dir = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-    let iso_path = current_dir.join("linuxmint-22.1-cinnamon-64bit.iso");
-    let qcow2_path = current_dir.join("mint.qcow2");
+    let qcow2_path = current_dir.join("ubuntu.qcow2");
 
     // Execute QEMU command
     let output = Command::new("qemu-system-x86_64")
         .args([
-            "-m", "8192",
-            "-smp", "2",
-            "-cdrom", iso_path.to_str().unwrap(),
+            "-m", "16384",
+            "-smp", "6",
             "-drive", &format!("file={}", qcow2_path.to_str().unwrap()),
             "-boot", "d",
             "-vga", "virtio",
-            "-net", "nic",
-            "-net", "user"
+            "-netdev", "user,id=net0,hostfwd=tcp::2222-:22",
+            "-device", "e1000,netdev=net0"
         ])
         .spawn();
 
