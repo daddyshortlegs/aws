@@ -1,68 +1,12 @@
 use axum::{
     routing::post,
     Router,
-    Json,
-    http::StatusCode,
 };
-use serde::{Deserialize, Serialize};
 use tower_http::cors::{CorsLayer, Any};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
-use tokio::process::Command;
-use std::path::PathBuf;
 
-#[derive(Debug, Serialize, Deserialize)]
-struct LaunchVmRequest {
-    name: String,
-    instance_type: String,
-    region: String,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct LaunchVmResponse {
-    success: bool,
-    message: String,
-    instance_id: Option<String>,
-}
-
-async fn launch_vm(
-    Json(payload): Json<LaunchVmRequest>,
-) -> (StatusCode, Json<LaunchVmResponse>) {
-    // Get the current directory path
-    let current_dir = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-    let qcow2_path = current_dir.join("ubuntu.qcow2");
-
-    // Execute QEMU command
-    let output = Command::new("qemu-system-x86_64")
-        .args([
-            "-m", "16384",
-            "-smp", "6",
-            "-drive", &format!("file={}", qcow2_path.to_str().unwrap()),
-            "-boot", "d",
-            "-vga", "virtio",
-            "-netdev", "user,id=net0,hostfwd=tcp::2222-:22",
-            "-device", "e1000,netdev=net0"
-        ])
-        .spawn();
-
-    match output {
-        Ok(_) => {
-            let response = LaunchVmResponse {
-                success: true,
-                message: format!("VM launch request received for {} in {}", payload.name, payload.region),
-                instance_id: Some("qemu-instance".to_string()),
-            };
-            (StatusCode::OK, Json(response))
-        }
-        Err(e) => {
-            let response = LaunchVmResponse {
-                success: false,
-                message: format!("Failed to launch VM: {}", e),
-                instance_id: None,
-            };
-            (StatusCode::INTERNAL_SERVER_ERROR, Json(response))
-        }
-    }
-}
+mod vm_launcher;
+use vm_launcher::launch_vm;
 
 #[tokio::main]
 async fn main() {
