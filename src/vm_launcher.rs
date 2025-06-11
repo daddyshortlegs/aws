@@ -1,12 +1,9 @@
-use axum::{
-    Json,
-    http::StatusCode,
-};
+use axum::{http::StatusCode, Json};
+use rand::Rng;
 use serde::{Deserialize, Serialize};
-use tokio::process::Command;
 use std::path::PathBuf;
 use tokio::fs;
-use rand::Rng;
+use tokio::process::Command;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct LaunchVmRequest {
@@ -49,13 +46,20 @@ pub async fn launch_vm(
     // Execute QEMU command
     let mut cmd = Command::new("qemu-system-x86_64");
     cmd.args([
-        "-m", "8192",
-        "-smp", "6",
-        "-drive", &format!("file={}", target_qcow2.to_str().unwrap()),
-        "-boot", "d",
-        "-vga", "virtio",
-        "-netdev", &format!("user,id=net0,hostfwd=tcp::{}:-:22", ssh_port),
-        "-device", "e1000,netdev=net0"
+        "-m",
+        "8192",
+        "-smp",
+        "6",
+        "-drive",
+        &format!("file={}", target_qcow2.to_str().unwrap()),
+        "-boot",
+        "d",
+        "-vga",
+        "virtio",
+        "-netdev",
+        &format!("user,id=net0,hostfwd=tcp::{}:-:22", ssh_port),
+        "-device",
+        "e1000,netdev=net0",
     ]);
 
     let output = cmd.spawn();
@@ -64,7 +68,10 @@ pub async fn launch_vm(
         Ok(child) => {
             let response = LaunchVmResponse {
                 success: true,
-                message: format!("VM launch request received for {} in {}", payload.name, payload.region),
+                message: format!(
+                    "VM launch request received for {} in {}",
+                    payload.name, payload.region
+                ),
                 instance_id: Some("qemu-instance".to_string()),
                 ssh_port: Some(ssh_port),
                 pid: child.id(),
@@ -82,4 +89,4 @@ pub async fn launch_vm(
             (StatusCode::INTERNAL_SERVER_ERROR, Json(response))
         }
     }
-} 
+}

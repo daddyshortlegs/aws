@@ -1,8 +1,5 @@
-use axum::{
-    routing::post,
-    Router,
-};
-use tower_http::cors::{CorsLayer, Any};
+use axum::{routing::post, Router};
+use tower_http::cors::{Any, CorsLayer};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 mod vm_launcher;
@@ -30,7 +27,9 @@ async fn main() {
         .layer(cors);
 
     // Run it
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:3000").await.unwrap();
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:3000")
+        .await
+        .unwrap();
     tracing::info!("listening on {}", listener.local_addr().unwrap());
     axum::serve(listener, app).await.unwrap();
-} 
+}
