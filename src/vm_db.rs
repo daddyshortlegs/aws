@@ -32,7 +32,7 @@ pub fn store_vm_info(vm_info: &VmInfo) -> std::io::Result<()> {
 pub fn list_vms() -> std::io::Result<Vec<VmInfo>> {
     let current_dir = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
     let vms_dir = current_dir.join("vms");
-    
+
     if !vms_dir.exists() {
         return Ok(Vec::new());
     }

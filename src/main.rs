@@ -1,12 +1,16 @@
-use axum::{routing::{post, get, delete}, Router, response::IntoResponse, http::StatusCode};
+use axum::{
+    http::StatusCode,
+    response::IntoResponse,
+    routing::{delete, get, post},
+    Router,
+};
+use std::io;
 use tower_http::cors::{Any, CorsLayer};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
-use std::io;
 
-mod vm_service;
 mod vm_db;
-use vm_service::{launch_vm, list_vms_handler, delete_vm_handler};
-
+mod vm_service;
+use vm_service::{delete_vm_handler, launch_vm, list_vms_handler};
 
 #[tokio::main]
 async fn main() {
