@@ -14,8 +14,7 @@ pub struct VmInfo {
 pub fn store_vm_info(vm_info: &VmInfo) -> std::io::Result<()> {
     println!("Storing VM info: {:?}", vm_info);
 
-    let current_dir = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-    let vms_dir = current_dir.join("vms");
+    let vms_dir = get_vms_dir();
 
     // Create vms directory if it doesn't exist
     if !vms_dir.exists() {
@@ -30,8 +29,7 @@ pub fn store_vm_info(vm_info: &VmInfo) -> std::io::Result<()> {
 }
 
 pub fn list_vms() -> std::io::Result<Vec<VmInfo>> {
-    let current_dir = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-    let vms_dir = current_dir.join("vms");
+    let vms_dir = get_vms_dir();
 
     if !vms_dir.exists() {
         return Ok(Vec::new());
@@ -53,8 +51,8 @@ pub fn list_vms() -> std::io::Result<Vec<VmInfo>> {
 }
 
 pub fn get_vm_by_id(id: &str) -> std::io::Result<Option<VmInfo>> {
-    let current_dir = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-    let vms_dir = current_dir.join("vms");
+    let vms_dir = get_vms_dir();
+
     let file_path = vms_dir.join(format!("{}.json", id));
 
     if !file_path.exists() {
@@ -71,8 +69,8 @@ pub fn get_vm_by_id(id: &str) -> std::io::Result<Option<VmInfo>> {
 }
 
 pub fn delete_vm_by_id(id: &str) -> std::io::Result<Option<VmInfo>> {
-    let current_dir = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-    let vms_dir = current_dir.join("vms");
+    let vms_dir = get_vms_dir();
+
     let file_path = vms_dir.join(format!("{}.json", id));
 
     if !file_path.exists() {
@@ -81,4 +79,9 @@ pub fn delete_vm_by_id(id: &str) -> std::io::Result<Option<VmInfo>> {
 
     fs::remove_file(file_path)?;
     Ok(None)
+}
+
+fn get_vms_dir() -> PathBuf {
+    let current_dir = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+    current_dir.join("vms")
 }
