@@ -21,6 +21,7 @@ pub struct LaunchVmResponse {
     pub message: String,
     pub instance_id: Option<String>,
     pub ssh_port: Option<u16>,
+    pub pid: Option<u32>,
 }
 
 pub async fn launch_vm(
@@ -40,30 +41,33 @@ pub async fn launch_vm(
             message: format!("Failed to copy QCOW2 file: {}", e),
             instance_id: None,
             ssh_port: None,
+            pid: None,
         };
         return (StatusCode::INTERNAL_SERVER_ERROR, Json(response));
     }
 
     // Execute QEMU command
-    let output = Command::new("qemu-system-x86_64")
-        .args([
-            "-m", "8192",
-            "-smp", "6",
-            "-drive", &format!("file={}", target_qcow2.to_str().unwrap()),
-            "-boot", "d",
-            "-vga", "virtio",
-            "-netdev", &format!("user,id=net0,hostfwd=tcp::{}:-:22", ssh_port),
-            "-device", "e1000,netdev=net0"
-        ])
-        .spawn();
+    let mut cmd = Command::new("qemu-system-x86_64");
+    cmd.args([
+        "-m", "8192",
+        "-smp", "6",
+        "-drive", &format!("file={}", target_qcow2.to_str().unwrap()),
+        "-boot", "d",
+        "-vga", "virtio",
+        "-netdev", &format!("user,id=net0,hostfwd=tcp::{}:-:22", ssh_port),
+        "-device", "e1000,netdev=net0"
+    ]);
+
+    let output = cmd.spawn();
 
     match output {
-        Ok(_) => {
+        Ok(child) => {
             let response = LaunchVmResponse {
                 success: true,
                 message: format!("VM launch request received for {} in {}", payload.name, payload.region),
                 instance_id: Some("qemu-instance".to_string()),
                 ssh_port: Some(ssh_port),
+                pid: child.id(),
             };
             (StatusCode::OK, Json(response))
         }
@@ -73,6 +77,7 @@ pub async fn launch_vm(
                 message: format!("Failed to launch VM: {}", e),
                 instance_id: None,
                 ssh_port: None,
+                pid: None,
             };
             (StatusCode::INTERNAL_SERVER_ERROR, Json(response))
         }
