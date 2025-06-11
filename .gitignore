@@ -26,3 +26,5 @@ Cargo.lock
 *.log 
 *.iso
 *.qcow2
+
+vms/

@@ -4,6 +4,9 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use tokio::fs;
 use tokio::process::Command;
+use uuid::Uuid;
+use crate::vm_db::store_vm_info;
+use crate::vm_db::VmInfo;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct LaunchVmRequest {
@@ -76,6 +79,19 @@ pub async fn launch_vm(
                 ssh_port: Some(ssh_port),
                 pid: child.id(),
             };
+
+            // generate random uuid
+            let uuid = Uuid::new_v4();
+
+            let vm_info = VmInfo {
+                id: uuid.to_string(),
+                name: payload.name,
+                ssh_port: ssh_port,
+                pid: child.id().unwrap(),
+            };
+
+            store_vm_info(&vm_info);
+
             (StatusCode::OK, Json(response))
         }
         Err(e) => {
