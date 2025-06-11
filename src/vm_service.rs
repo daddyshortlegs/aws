@@ -1,12 +1,13 @@
-use crate::vm_db::store_vm_info;
-use crate::vm_db::VmInfo;
-use axum::{http::StatusCode, Json};
+use crate::vm_db::{store_vm_info, list_vms, VmInfo};
+use axum::{http::StatusCode, Json, response::IntoResponse};
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
+use std::io;
 use tokio::fs;
 use tokio::process::Command;
 use uuid::Uuid;
+
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct LaunchVmRequest {
@@ -106,3 +107,22 @@ pub async fn launch_vm(
         }
     }
 }
+
+pub async fn list_vms_handler() -> impl IntoResponse {
+    match list_vms() {
+        Ok(vms) => (StatusCode::OK, axum::Json(vms)).into_response(),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response()
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct DeleteVmRequest {
+    pub id: String,
+}
+
+
+pub async fn delete_vm_handler(Json(payload): Json<DeleteVmRequest>) -> StatusCode {
+    println!("Deleting VM: {:?}", payload);
+    StatusCode::OK
+}
+    

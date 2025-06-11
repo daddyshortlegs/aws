@@ -1,19 +1,12 @@
-use axum::{routing::{post, get}, Router, response::IntoResponse, http::StatusCode};
+use axum::{routing::{post, get, delete}, Router, response::IntoResponse, http::StatusCode};
 use tower_http::cors::{Any, CorsLayer};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use std::io;
 
-mod vm_launcher;
+mod vm_service;
 mod vm_db;
-use vm_launcher::launch_vm;
-use vm_db::list_vms;
+use vm_service::{launch_vm, list_vms_handler, delete_vm_handler};
 
-async fn list_vms_handler() -> impl IntoResponse {
-    match list_vms() {
-        Ok(vms) => (StatusCode::OK, axum::Json(vms)).into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response()
-    }
-}
 
 #[tokio::main]
 async fn main() {
@@ -35,6 +28,7 @@ async fn main() {
     let app = Router::new()
         .route("/launch-vm", post(launch_vm))
         .route("/list-vms", get(list_vms_handler))
+        .route("/delete-vm", delete(delete_vm_handler))
         .layer(cors);
 
     // Run it
