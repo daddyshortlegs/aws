@@ -1,4 +1,4 @@
-use crate::vm_db::{list_vms, store_vm_info, VmInfo};
+use crate::vm_db::{list_vms, store_vm_info, VmInfo, get_vm_by_id};
 use axum::{http::StatusCode, response::IntoResponse, Json};
 use rand::Rng;
 use serde::{Deserialize, Serialize};
@@ -7,6 +7,8 @@ use std::path::PathBuf;
 use tokio::fs;
 use tokio::process::Command;
 use uuid::Uuid;
+use nix::sys::signal::{kill, Signal};
+use nix::unistd::Pid;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct LaunchVmRequest {
@@ -119,7 +121,46 @@ pub struct DeleteVmRequest {
     pub id: String,
 }
 
-pub async fn delete_vm_handler(Json(payload): Json<DeleteVmRequest>) -> StatusCode {
+pub async fn delete_vm_handler(Json(payload): Json<DeleteVmRequest>) -> impl IntoResponse {
     println!("Deleting VM: {:?}", payload);
-    StatusCode::OK
+    
+    match get_vm_by_id(&payload.id) {
+        Ok(Some(vm_info)) => {
+            // Try to terminate the process
+            match kill(Pid::from_raw(vm_info.pid as i32), Signal::SIGTERM) {
+                Ok(_) => {
+                    // Wait a bit for the process to terminate gracefully
+                    tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+                    
+                    // Check if process is still running, if so, force kill it
+                    if let Ok(_) = kill(Pid::from_raw(vm_info.pid as i32), Signal::SIGKILL) {
+                        println!("Process {} was still running, force killed", vm_info.pid);
+                    }
+                    
+                    // Delete the JSON file
+                    let current_dir = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+                    let vms_dir = current_dir.join("vms");
+                    let file_path = vms_dir.join(format!("{}.json", vm_info.id));
+                    
+                    if let Err(e) = fs::remove_file(file_path).await {
+                        println!("Error deleting VM info file: {}", e);
+                        return (StatusCode::INTERNAL_SERVER_ERROR, "Failed to delete VM info file").into_response();
+                    }
+                    
+                    (StatusCode::OK, "VM successfully terminated and removed").into_response()
+                },
+                Err(e) => {
+                    println!("Error terminating process {}: {}", vm_info.pid, e);
+                    (StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to terminate VM: {}", e)).into_response()
+                }
+            }
+        },
+        Ok(None) => {
+            (StatusCode::NOT_FOUND, "VM not found").into_response()
+        },
+        Err(e) => {
+            println!("Error retrieving VM info: {}", e);
+            (StatusCode::INTERNAL_SERVER_ERROR, format!("Error retrieving VM info: {}", e)).into_response()
+        }
+    }
 }
