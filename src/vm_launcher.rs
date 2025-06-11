@@ -1,3 +1,5 @@
+use crate::vm_db::store_vm_info;
+use crate::vm_db::VmInfo;
 use axum::{http::StatusCode, Json};
 use rand::Rng;
 use serde::{Deserialize, Serialize};
@@ -5,8 +7,6 @@ use std::path::PathBuf;
 use tokio::fs;
 use tokio::process::Command;
 use uuid::Uuid;
-use crate::vm_db::store_vm_info;
-use crate::vm_db::VmInfo;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct LaunchVmRequest {

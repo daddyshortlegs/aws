@@ -2,8 +2,8 @@ use axum::{routing::post, Router};
 use tower_http::cors::{Any, CorsLayer};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-mod vm_launcher;
 mod vm_db;
+mod vm_launcher;
 use vm_launcher::launch_vm;
 
 #[tokio::main]
