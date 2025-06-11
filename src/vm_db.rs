@@ -56,18 +56,29 @@ pub fn get_vm_by_id(id: &str) -> std::io::Result<Option<VmInfo>> {
     let current_dir = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
     let vms_dir = current_dir.join("vms");
     let file_path = vms_dir.join(format!("{}.json", id));
-    
+
     if !file_path.exists() {
         return Ok(None);
     }
-    
+
     match fs::read_to_string(file_path) {
-        Ok(contents) => {
-            match serde_json::from_str(&contents) {
-                Ok(vm_info) => Ok(Some(vm_info)),
-                Err(e) => Err(std::io::Error::new(std::io::ErrorKind::InvalidData, e))
-            }
+        Ok(contents) => match serde_json::from_str(&contents) {
+            Ok(vm_info) => Ok(Some(vm_info)),
+            Err(e) => Err(std::io::Error::new(std::io::ErrorKind::InvalidData, e)),
         },
-        Err(e) => Err(e)
+        Err(e) => Err(e),
     }
+}
+
+pub fn delete_vm_by_id(id: &str) -> std::io::Result<Option<VmInfo>> {
+    let current_dir = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+    let vms_dir = current_dir.join("vms");
+    let file_path = vms_dir.join(format!("{}.json", id));
+
+    if !file_path.exists() {
+        return Ok(None);
+    }
+
+    fs::remove_file(file_path)?;
+    Ok(None)
 }
