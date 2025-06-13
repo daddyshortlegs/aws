@@ -9,6 +9,7 @@ use std::path::PathBuf;
 use tokio::fs;
 use tokio::process::Command;
 use uuid::Uuid;
+use crate::config::Config;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct LaunchVmRequest {
@@ -31,10 +32,12 @@ pub async fn launch_vm(
 ) -> (StatusCode, Json<LaunchVmResponse>) {
     let current_dir = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
     let source_qcow2 = current_dir.join("ubuntu.qcow2");
-    let target_qcow2 = current_dir.join(format!("{}.qcow2", payload.name));
 
-    // Generate random port in ephemeral range (49152-65535)
-    let ssh_port = rand::thread_rng().gen_range(49152..65535);
+    let config = Config::load().expect("Failed to load configuration");
+    let target_qcow2 = config.storage.qcow2_dir.join(format!("{}.qcow2", payload.name));
+
+
+    println!("target_qcow2: {:?}", target_qcow2);
 
     // Copy the QCOW2 file
     if let Err(e) = fs::copy(&source_qcow2, &target_qcow2).await {
@@ -47,6 +50,9 @@ pub async fn launch_vm(
         };
         return (StatusCode::INTERNAL_SERVER_ERROR, Json(response));
     }
+
+    // Generate random port in ephemeral range (49152-65535)
+    let ssh_port = rand::thread_rng().gen_range(49152..65535);
 
     // Execute QEMU command
     let mut cmd = Command::new("qemu-system-x86_64");
@@ -73,6 +79,8 @@ pub async fn launch_vm(
         Ok(child) => {
             // generate random uuid
             let uuid = Uuid::new_v4();
+
+
 
             let response = LaunchVmResponse {
                 success: true,

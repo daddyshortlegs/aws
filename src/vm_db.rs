@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
+use crate::config::Config;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct VmInfo {
@@ -14,14 +15,8 @@ pub struct VmInfo {
 pub fn store_vm_info(vm_info: &VmInfo) -> std::io::Result<()> {
     println!("Storing VM info: {:?}", vm_info);
 
-    let vms_dir = get_vms_dir();
+    let file_path = create_file_path(&vm_info.id)?;
 
-    // Create vms directory if it doesn't exist
-    if !vms_dir.exists() {
-        fs::create_dir(&vms_dir)?;
-    }
-
-    let file_path = vms_dir.join(format!("{}.json", vm_info.id));
     let json = serde_json::to_string_pretty(vm_info)?;
     println!("Writing VM info to: {:?}", file_path);
     println!("VM info: {:?}", json);
@@ -29,7 +24,7 @@ pub fn store_vm_info(vm_info: &VmInfo) -> std::io::Result<()> {
 }
 
 pub fn list_vms() -> std::io::Result<Vec<VmInfo>> {
-    let vms_dir = get_vms_dir();
+    let vms_dir = Config::get_vms_dir();
 
     if !vms_dir.exists() {
         return Ok(Vec::new());
@@ -51,9 +46,7 @@ pub fn list_vms() -> std::io::Result<Vec<VmInfo>> {
 }
 
 pub fn get_vm_by_id(id: &str) -> std::io::Result<Option<VmInfo>> {
-    let vms_dir = get_vms_dir();
-
-    let file_path = vms_dir.join(format!("{}.json", id));
+    let file_path = create_file_path(id)?;
 
     if !file_path.exists() {
         return Ok(None);
@@ -69,9 +62,7 @@ pub fn get_vm_by_id(id: &str) -> std::io::Result<Option<VmInfo>> {
 }
 
 pub fn delete_vm_by_id(id: &str) -> std::io::Result<Option<VmInfo>> {
-    let vms_dir = get_vms_dir();
-
-    let file_path = vms_dir.join(format!("{}.json", id));
+    let file_path = create_file_path(id)?;
 
     if !file_path.exists() {
         return Ok(None);
@@ -81,7 +72,8 @@ pub fn delete_vm_by_id(id: &str) -> std::io::Result<Option<VmInfo>> {
     Ok(None)
 }
 
-fn get_vms_dir() -> PathBuf {
-    let current_dir = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-    current_dir.join("vms")
+fn create_file_path(id: &str) -> std::io::Result<PathBuf> {
+    let vms_dir = Config::get_vms_dir();
+    let file_path = vms_dir.join(format!("{}.json", id));
+    Ok(file_path)
 }

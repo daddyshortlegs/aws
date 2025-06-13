@@ -9,6 +9,7 @@ use tower_http::cors::{Any, CorsLayer};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 mod vm_db;
+mod config;
 mod vm_service;
 use vm_service::{delete_vm_handler, launch_vm, list_vms_handler};
 
@@ -21,6 +22,10 @@ async fn main() {
         ))
         .with(tracing_subscriber::fmt::layer())
         .init();
+
+    // Load configuration
+    let config = config::Config::load().expect("Failed to load configuration");
+    tracing::info!("Loaded configuration: {:?}", config);
 
     // Configure CORS
     let cors = CorsLayer::new()
