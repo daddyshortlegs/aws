@@ -33,6 +33,7 @@ Create a virtual disk:
 qemu-img create -f qcow2 ubuntu.qcow2 20G
 ```
 
+Grab the List ISO from https://releases.ubuntu.com/noble/ubuntu-24.04.2-live-server-amd64.iso
 Run the Live ISO image to install it to the 'disk' just created:
 
 ```
