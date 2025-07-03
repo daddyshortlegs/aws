@@ -28,3 +28,5 @@ Cargo.lock
 *.qcow2
 
 vms/
+vm-data/
+
