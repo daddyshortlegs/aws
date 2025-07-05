@@ -1,6 +1,7 @@
 import React from 'react';
 import './App.css';
 import 'bootstrap/dist/css/bootstrap.min.css';
+import VMList from './components/VMList';
 
 function App() {
   return (
@@ -30,71 +31,18 @@ function App() {
       <main className="container mt-4">
         <div className="row">
           <div className="col-12">
-            <div className="card">
-              <div className="card-header">
-                <h2 className="card-title mb-0">Welcome to VM Orchestrator</h2>
-              </div>
-              <div className="card-body">
-                <p className="card-text">
-                  This is a React TypeScript application with Bootstrap styling. 
-                  You can use this as a starting point for your VM management interface.
-                </p>
-                <div className="d-grid gap-2 d-md-flex justify-content-md-start">
-                  <button className="btn btn-primary me-md-2" type="button">
-                    Launch VM
-                  </button>
-                  <button className="btn btn-outline-secondary" type="button">
-                    View All VMs
-                  </button>
-                </div>
-              </div>
+            <div className="d-flex justify-content-between align-items-center mb-4">
+              <h1>Virtual Machine Management</h1>
+              <button className="btn btn-primary">
+                <i className="bi bi-plus-circle"></i> Launch New VM
+              </button>
             </div>
           </div>
         </div>
 
-        <div className="row mt-4">
-          <div className="col-md-6">
-            <div className="card">
-              <div className="card-header">
-                <h5 className="card-title mb-0">Quick Actions</h5>
-              </div>
-              <div className="card-body">
-                <div className="d-grid gap-2">
-                  <button className="btn btn-success" type="button">
-                    Create New VM
-                  </button>
-                  <button className="btn btn-info" type="button">
-                    List Running VMs
-                  </button>
-                  <button className="btn btn-warning" type="button">
-                    System Status
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div className="col-md-6">
-            <div className="card">
-              <div className="card-header">
-                <h5 className="card-title mb-0">System Information</h5>
-              </div>
-              <div className="card-body">
-                <ul className="list-group list-group-flush">
-                  <li className="list-group-item d-flex justify-content-between align-items-center">
-                    Active VMs
-                    <span className="badge bg-primary rounded-pill">0</span>
-                  </li>
-                  <li className="list-group-item d-flex justify-content-between align-items-center">
-                    Total VMs
-                    <span className="badge bg-secondary rounded-pill">0</span>
-                  </li>
-                  <li className="list-group-item d-flex justify-content-between align-items-center">
-                    System Status
-                    <span className="badge bg-success rounded-pill">Online</span>
-                  </li>
-                </ul>
-              </div>
-            </div>
+        <div className="row">
+          <div className="col-12">
+            <VMList />
           </div>
         </div>
       </main>
