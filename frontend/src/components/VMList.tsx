@@ -1,14 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { VM } from '../types';
 
-const VMList: React.FC = () => {
+interface VMListProps {
+  refreshKey?: number;
+}
+
+const VMList: React.FC<VMListProps> = ({ refreshKey = 0 }) => {
   const [vms, setVms] = useState<VM[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchVMs();
-  }, []);
+  }, [refreshKey]);
 
   const fetchVMs = async () => {
     try {

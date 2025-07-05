@@ -1,9 +1,20 @@
-import React from 'react';
+import React, { useState } from 'react';
 import './App.css';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import VMList from './components/VMList';
+import LaunchVMModal from './components/LaunchVMModal';
 
 function App() {
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  const handleLaunchVM = (name: string, instanceType: string) => {
+    // The modal will handle the API call, this is just for any additional actions
+    console.log(`VM launched: ${name} with type ${instanceType}`);
+    // Trigger a refresh of the VM list
+    setRefreshKey(prev => prev + 1);
+  };
+
   return (
     <div className="App">
       <nav className="navbar navbar-expand-lg navbar-dark bg-dark">
@@ -33,7 +44,10 @@ function App() {
           <div className="col-12">
             <div className="d-flex justify-content-between align-items-center mb-4">
               <h1>Virtual Machine Management</h1>
-              <button className="btn btn-primary">
+              <button 
+                className="btn btn-primary"
+                onClick={() => setIsModalOpen(true)}
+              >
                 <i className="bi bi-plus-circle"></i> Launch New VM
               </button>
             </div>
@@ -42,10 +56,16 @@ function App() {
 
         <div className="row">
           <div className="col-12">
-            <VMList />
+            <VMList refreshKey={refreshKey} />
           </div>
         </div>
       </main>
+
+      <LaunchVMModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onLaunch={handleLaunchVM}
+      />
     </div>
   );
 }
