@@ -9,6 +9,7 @@ const VMList: React.FC<VMListProps> = ({ refreshKey = 0 }) => {
   const [vms, setVms] = useState<VM[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [deletingVM, setDeletingVM] = useState<string | null>(null);
 
   useEffect(() => {
     fetchVMs();
@@ -37,6 +38,42 @@ const VMList: React.FC<VMListProps> = ({ refreshKey = 0 }) => {
       console.error('Error fetching VMs:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const deleteVM = async (vmId: string, vmName: string) => {
+    if (!window.confirm(`Are you sure you want to delete VM "${vmName}"? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      setDeletingVM(vmId);
+      setError(null);
+
+      const response = await fetch('http://127.0.0.1:8080/delete-vm', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          id: vmId,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.text();
+      console.log('Delete result:', result);
+      
+      // Refresh the VM list after successful deletion
+      await fetchVMs();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete VM');
+      console.error('Error deleting VM:', err);
+    } finally {
+      setDeletingVM(null);
     }
   };
 
@@ -121,8 +158,19 @@ const VMList: React.FC<VMListProps> = ({ refreshKey = 0 }) => {
                         <button className="btn btn-outline-warning btn-sm">
                           Stop
                         </button>
-                        <button className="btn btn-outline-danger btn-sm">
-                          Delete
+                        <button 
+                          className="btn btn-outline-danger btn-sm"
+                          onClick={() => deleteVM(vm.id, vm.name)}
+                          disabled={deletingVM === vm.id}
+                        >
+                          {deletingVM === vm.id ? (
+                            <>
+                              <span className="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                              Deleting...
+                            </>
+                          ) : (
+                            'Delete'
+                          )}
                         </button>
                       </div>
                     </td>

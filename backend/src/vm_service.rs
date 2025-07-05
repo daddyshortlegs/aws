@@ -145,14 +145,12 @@ pub async fn delete_vm_handler(Json(payload): Json<DeleteVmRequest>) -> impl Int
                         println!("Process {} was still running, force killed", vm_info.pid);
                     }
 
-                    // Delete the JSON file
-                    let current_dir =
-                        std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-                    let vms_dir = current_dir.join("vms");
-                    let file_path = vms_dir.join(format!("{}.json", vm_info.id));
+                    // Delete the JSON file using the same path as other operations
+                    let config = Config::load().expect("Failed to load configuration");
+                    let file_path = config.storage.metadata_dir.join(format!("{}.json", vm_info.id));
 
-                    if let Err(e) = fs::remove_file(file_path).await {
-                        println!("Error deleting VM info file: {}", e);
+                    if let Err(e) = fs::remove_file(&file_path).await {
+                        println!("Error deleting VM info file: {:?} - {}", file_path, e);
                         return (
                             StatusCode::INTERNAL_SERVER_ERROR,
                             "Failed to delete VM info file",
