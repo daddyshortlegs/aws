@@ -158,6 +158,17 @@ pub async fn delete_vm_handler(Json(payload): Json<DeleteVmRequest>) -> impl Int
                             .into_response();
                     }
 
+                    // Delete the corresponding QCOW2 file
+                    let qcow2_file_path = config.storage.qcow2_dir.join(format!("{}.qcow2", vm_info.name));
+                    
+                    if let Err(e) = fs::remove_file(&qcow2_file_path).await {
+                        println!("Warning: Could not delete QCOW2 file: {:?} - {}", qcow2_file_path, e);
+                        // Don't fail the entire operation if QCOW2 deletion fails
+                        // The JSON metadata is more important to clean up
+                    } else {
+                        println!("Successfully deleted QCOW2 file: {:?}", qcow2_file_path);
+                    }
+
                     delete_vm_by_id(&vm_info.id);
 
                     (StatusCode::OK, "VM successfully terminated and removed").into_response()
