@@ -11,7 +11,9 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 mod vm_db;
 mod config;
 mod vm_service;
+mod websocket;
 use vm_service::{delete_vm_handler, launch_vm, list_vms_handler};
+use websocket::websocket_handler;
 
 #[tokio::main]
 async fn main() {
@@ -38,6 +40,7 @@ async fn main() {
         .route("/launch-vm", post(launch_vm))
         .route("/list-vms", get(list_vms_handler))
         .route("/delete-vm", delete(delete_vm_handler))
+        .route("/ws", get(websocket_handler))
         .layer(cors);
 
     // Run it
