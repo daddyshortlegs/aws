@@ -49,42 +49,19 @@ const SSHTerminal: React.FC<SSHTerminalProps> = ({ vmName, sshPort, onClose }) =
     };
     window.addEventListener('resize', handleResize);
 
-    // Write welcome message
-    terminal.writeln(`\x1b[1;32mWelcome to SSH Terminal\x1b[0m`);
-    terminal.writeln(`\x1b[1;36mConnecting to VM: ${vmName}\x1b[0m`);
-    terminal.writeln(`\x1b[1;33mSSH Port: ${sshPort}\x1b[0m`);
-    terminal.writeln('');
 
-    // Simulate SSH connection (in a real implementation, you'd connect to a WebSocket proxy)
-    terminal.writeln(`\x1b[1;34mEstablishing SSH connection...\x1b[0m`);
-    
-    setTimeout(() => {
-      terminal.writeln(`\x1b[1;32m✓ Connected to ${vmName}\x1b[0m`);
-      terminal.writeln(`\x1b[1;37mLast login: ${new Date().toLocaleString()}\x1b[0m`);
-      terminal.writeln('');
-      terminal.writeln(`\x1b[1;33m${vmName}@ubuntu:~$ \x1b[0m`);
-    }, 1000);
-
-    // Handle user input
-    let currentLine = '';
+    const socket = new WebSocket('ws://localhost:3001');
+  
+    socket.onopen = () => {
+      terminal.writeln('Connected to server.');
+    };
+  
+    socket.onmessage = (event) => {
+      terminal.write(event.data);
+    };
+  
     terminal.onData((data) => {
-      if (data === '\r') {
-        // Enter key pressed
-        terminal.writeln('');
-        handleCommand(currentLine, terminal);
-        currentLine = '';
-        terminal.write(`\x1b[1;33m${vmName}@ubuntu:~$ \x1b[0m`);
-      } else if (data === '\u007F') {
-        // Backspace
-        if (currentLine.length > 0) {
-          currentLine = currentLine.slice(0, -1);
-          terminal.write('\b \b');
-        }
-      } else if (data >= ' ') {
-        // Printable character
-        currentLine += data;
-        terminal.write(data);
-      }
+      socket.send(data);
     });
 
     terminalInstance.current = terminal;
@@ -95,33 +72,7 @@ const SSHTerminal: React.FC<SSHTerminalProps> = ({ vmName, sshPort, onClose }) =
     };
   }, [vmName, sshPort]);
 
-  const handleCommand = (command: string, terminal: Terminal) => {
-    const trimmedCommand = command.trim();
-    
-    if (!trimmedCommand) return;
 
-    // Simulate some basic commands
-    switch (trimmedCommand) {
-      case 'ls':
-        terminal.writeln('Desktop  Documents  Downloads  Pictures  Videos');
-        break;
-      case 'pwd':
-        terminal.writeln('/home/ubuntu');
-        break;
-      case 'whoami':
-        terminal.writeln('ubuntu');
-        break;
-      case 'date':
-        terminal.writeln(new Date().toString());
-        break;
-      case 'exit':
-        terminal.writeln('\x1b[1;31mConnection closed.\x1b[0m');
-        setTimeout(() => onClose(), 1000);
-        break;
-      default:
-        terminal.writeln(`\x1b[1;31mbash: ${trimmedCommand}: command not found\x1b[0m`);
-    }
-  };
 
   return (
     <div className="ssh-terminal-container">
