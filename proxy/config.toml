@@ -1,0 +1,7 @@
+# Proxy service configuration
+[proxy]
+backend_url = "http://127.0.0.1:8080"
+proxy_port = 3000
+
+[logging]
+level = "info"
