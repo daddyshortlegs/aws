@@ -50,7 +50,7 @@ const SSHTerminal: React.FC<SSHTerminalProps> = ({ vmName, sshPort, onClose }) =
     window.addEventListener('resize', handleResize);
 
 
-    const socket = new WebSocket('ws://localhost:3001');
+    const socket = new WebSocket(`ws://localhost:3001?port=${sshPort}`);
   
     socket.onopen = () => {
       terminal.writeln('Connected to server.');

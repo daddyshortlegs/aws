@@ -2,6 +2,7 @@ const http = require('http');
 const WebSocket = require('ws');
 const pty = require('node-pty');
 const os = require('os');
+const url = require('url');
 const config = require('./config');
 
 // Create HTTP server
@@ -27,11 +28,24 @@ wss.on('connection', (ws, req) => {
     console.log('Client connected from:', req.socket.remoteAddress);
   }
   
-  // Spawn SSH shell
+  // Parse query parameters from the WebSocket connection URL
+  const parsedUrl = url.parse(req.url, true);
+  const query = parsedUrl.query;
+  
+  // Extract SSH connection parameters from query string
+  const sshHost = query.host || config.ssh.host;
+  const sshPort = parseInt(query.port) || config.ssh.port;
+  const sshUser = query.user || config.ssh.user;
+  
+  if (config.logging.enableConnectionLogging) {
+    console.log(`SSH connection parameters: ${sshUser}@${sshHost}:${sshPort}`);
+  }
+  
+  // Spawn SSH shell with dynamic parameters
   const shell = os.platform() === 'win32' ? 'powershell.exe' : 'bash';
   const ssh = pty.spawn('ssh', [
-    '-p', config.ssh.port.toString(),
-    `${config.ssh.user}@${config.ssh.host}`
+    '-p', sshPort.toString(),
+    `${sshUser}@${sshHost}`
   ], {
     name: config.terminal.name,
     cols: config.terminal.cols,
@@ -83,7 +97,10 @@ server.listen(config.server.port, config.server.host, () => {
   console.log(`SSH WebSocket server running on ${config.server.host}:${config.server.port}`);
   console.log(`Health check: http://${config.server.host}:${config.server.port}/health`);
   console.log(`WebSocket endpoint: ws://${config.server.host}:${config.server.port}`);
-  console.log(`SSH connection: ${config.ssh.user}@${config.ssh.host}:${config.ssh.port}`);
+  console.log(`Default SSH connection: ${config.ssh.user}@${config.ssh.host}:${config.ssh.port}`);
+  console.log(`\nConnection examples:`);
+  console.log(`  Default: ws://${config.server.host}:${config.server.port}`);
+  console.log(`  Custom: ws://${config.server.host}:${config.server.port}?host=192.168.1.100&port=22&user=admin`);
 });
 
 // Graceful shutdown
