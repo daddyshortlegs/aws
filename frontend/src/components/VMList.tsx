@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { VM } from '../types';
 import TerminalModal from './TerminalModal';
+import { getApiUrl } from '../config';
 
 interface VMListProps {
   refreshKey?: number;
@@ -30,7 +31,7 @@ const VMList: React.FC<VMListProps> = ({ refreshKey = 0 }) => {
       setLoading(true);
       setError(null);
       
-      const response = await fetch('http://127.0.0.1:8080/list-vms', {
+      const response = await fetch(getApiUrl('listVMs'), {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -60,7 +61,7 @@ const VMList: React.FC<VMListProps> = ({ refreshKey = 0 }) => {
       setDeletingVM(vmId);
       setError(null);
 
-      const response = await fetch('http://127.0.0.1:8080/delete-vm', {
+      const response = await fetch(getApiUrl('deleteVM'), {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',

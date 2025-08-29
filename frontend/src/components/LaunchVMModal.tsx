@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { getApiUrl } from '../config';
 
 interface LaunchVMModalProps {
   isOpen: boolean;
@@ -42,7 +43,7 @@ const LaunchVMModal: React.FC<LaunchVMModalProps> = ({ isOpen, onClose, onLaunch
     setError(null);
 
     try {
-      const response = await fetch('http://127.0.0.1:8080/launch-vm', {
+      const response = await fetch(getApiUrl('launchVM'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

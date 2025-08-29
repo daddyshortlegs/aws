@@ -74,6 +74,44 @@ src/
 - `npm test` - Runs the test suite
 - `npm run eject` - Ejects from Create React App (one-way operation)
 
+## Configuration
+
+The frontend application can be configured to connect to different backend services. Configuration is handled through environment variables or by modifying the `src/config.ts` file.
+
+### Environment Variables
+
+Create a `.env` file in the frontend directory with the following variables:
+
+```bash
+# Backend service configuration
+REACT_APP_BACKEND_HOST=127.0.0.1
+REACT_APP_BACKEND_PORT=8080
+REACT_APP_BACKEND_PROTOCOL=http
+```
+
+### Configuration File
+
+The main configuration is in `src/config.ts`. You can modify this file to change:
+
+- Backend host address
+- Backend port number
+- Protocol (http/https)
+- API endpoints
+
+### Quick Configuration Changes
+
+To change the backend port from 8080 to another port (e.g., 3000):
+
+1. **Option 1**: Set environment variable
+   ```bash
+   export REACT_APP_BACKEND_PORT=3000
+   ```
+
+2. **Option 2**: Modify `src/config.ts`
+   ```typescript
+   port: parseInt(process.env.REACT_APP_BACKEND_PORT || '3000', 10),
+   ```
+
 ## Dependencies
 
 - **React** - UI library
