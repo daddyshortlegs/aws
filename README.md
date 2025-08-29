@@ -9,7 +9,7 @@ The VM Orchestrator consists of several interconnected components:
 ```
 ┌─────────────┐    ┌─────────────┐    ┌─────────────┐
 │   Frontend  │◄──►│    Proxy    │◄──►│   Backend   │
-│  (React)    │    │   (Rust)    │    │   (Rust)    │
+│  (Port 3000)│    │ (Port 8080) │    │(Port 8081) │
 └─────────────┘    └─────────────┘    └─────────────┘
        │                   │                   │
        │                   │                   │
@@ -17,7 +17,7 @@ The VM Orchestrator consists of several interconnected components:
 ┌──────────────┐    ┌─────────────┐    ┌─────────────┐
 │ SSH WebSocket│    │   VM Data   │    │   VM Files  │
 │   Server     │    │  (JSON)     │    │  (QCOW2)    │
-│  (Node.js)   │    └─────────────┘    └─────────────┘
+│ (Port 3001)  │    └─────────────┘    └─────────────┘
 └──────────────┘
 ```
 
@@ -28,12 +28,12 @@ The VM Orchestrator consists of several interconnected components:
 - **Purpose**: Web-based user interface for VM management
 
 ### 2. Backend (Rust + Axum)
-- **Port**: 8080
+- **Port**: 8081
 - **Technology**: Rust, Axum, Tokio
 - **Purpose**: Core VM management API and WebSocket handling
 
 ### 3. Proxy (Rust + Axum)
-- **Port**: 3000 (configurable)
+- **Port**: 8080 (configurable)
 - **Technology**: Rust, Axum, Reqwest
 - **Purpose**: HTTP proxy that forwards API requests to the backend
 
@@ -49,6 +49,6 @@ The VM Orchestrator consists of several interconnected components:
 | Component | Default Port | Environment Variable | Purpose |
 |-----------|--------------|---------------------|---------|
 | Frontend | 3000 | `PORT` | React development server |
-| Backend | 8080 | `PORT` | VM management API |
-| Proxy | 3000 | `PROXY_PORT` | HTTP request forwarding |
+| Backend | 8081 | `PORT` | VM management API |
+| Proxy | 8080 | `PROXY_PORT` | HTTP request forwarding |
 | SSH Server | 3001 | `PORT` | WebSocket SSH terminal |
