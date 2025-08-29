@@ -1,16 +1,22 @@
 {
-  "name": "ssh",
+  "name": "ssh-websocket",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "Simple WebSocket-based SSH terminal server",
+  "main": "server.js",
   "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": [],
+  "keywords": [
+    "ssh",
+    "websocket",
+    "terminal",
+    "pty"
+  ],
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "express": "^5.1.0",
     "node-pty": "^1.0.0",
     "ws": "^8.18.3"
   }
