@@ -125,7 +125,6 @@ const VMList: React.FC<VMListProps> = ({ refreshKey = 0 }) => {
           {vms.length === 0 ? (
             <div className="text-center py-4">
               <p className="text-muted">No VMs found</p>
-              <button className="btn btn-primary">Create New VM</button>
             </div>
           ) : (
             <div className="table-responsive">
