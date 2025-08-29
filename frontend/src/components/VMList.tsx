@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { VM } from '../types';
-import TerminalModal from './TerminalModal';
 import { getApiUrl } from '../config';
 
 interface VMListProps {
@@ -12,15 +11,6 @@ const VMList: React.FC<VMListProps> = ({ refreshKey = 0 }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [deletingVM, setDeletingVM] = useState<string | null>(null);
-  const [terminalModal, setTerminalModal] = useState<{
-    isOpen: boolean;
-    vmName: string;
-    sshPort: number;
-  }>({
-    isOpen: false,
-    vmName: '',
-    sshPort: 0,
-  });
 
   useEffect(() => {
     fetchVMs();
@@ -89,19 +79,9 @@ const VMList: React.FC<VMListProps> = ({ refreshKey = 0 }) => {
   };
 
   const handleConnect = (vmName: string, sshPort: number) => {
-    setTerminalModal({
-      isOpen: true,
-      vmName,
-      sshPort,
-    });
-  };
-
-  const closeTerminalModal = () => {
-    setTerminalModal({
-      isOpen: false,
-      vmName: '',
-      sshPort: 0,
-    });
+    // Open SSH terminal in a new tab
+    const terminalUrl = `/terminal?vm=${encodeURIComponent(vmName)}&port=${sshPort}`;
+    window.open(terminalUrl, `terminal-${vmName}-${sshPort}`, 'width=1200,height=800,scrollbars=yes,resizable=yes');
   };
 
   const getStatusBadgeClass = (pid: number) => {
@@ -183,8 +163,9 @@ const VMList: React.FC<VMListProps> = ({ refreshKey = 0 }) => {
                           <button 
                             className="btn btn-outline-primary btn-sm"
                             onClick={() => handleConnect(vm.name, vm.ssh_port)}
+                            title={`Open SSH terminal for ${vm.name} in new tab`}
                           >
-                            Connect
+                            <i className="bi bi-terminal"></i> Connect
                           </button>
                           <button className="btn btn-outline-warning btn-sm">
                             Stop
@@ -213,13 +194,6 @@ const VMList: React.FC<VMListProps> = ({ refreshKey = 0 }) => {
           )}
         </div>
       </div>
-
-      <TerminalModal
-        isOpen={terminalModal.isOpen}
-        onClose={closeTerminalModal}
-        vmName={terminalModal.vmName}
-        sshPort={terminalModal.sshPort}
-      />
     </>
   );
 };
