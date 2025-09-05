@@ -9,7 +9,7 @@ The VM Orchestrator consists of several interconnected components:
 ```
 ┌─────────────┐    ┌─────────────┐    ┌─────────────┐
 │   Frontend  │◄──►│    Proxy    │◄──►│   Backend   │
-│  (Port 3000)│    │ (Port 8080) │    │(Port 8081) │
+│  (Port 3000)│    │ (Port 8080) │    │(Port 8081)  │
 └─────────────┘    └─────────────┘    └─────────────┘
        │                   │                   │
        │                   │                   │
