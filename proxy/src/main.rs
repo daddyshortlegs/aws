@@ -44,7 +44,7 @@ async fn main() {
         .route("/launch-vm", post(proxy_handler))
         .route("/list-vms", get(proxy_handler))
         .route("/delete-vm", delete(proxy_handler))
-        .route("/ws", get(websocket_handler))
+        // .route("/ws", get(websocket_handler))
         // Catch-all route for any other endpoints
         .fallback(proxy_handler)
         .layer(cors)
@@ -73,6 +73,3 @@ async fn proxy_handler(
     proxy_service.proxy_request(method, uri, headers, body, None).await
 }
 
-async fn websocket_handler() -> &'static str {
-    "WebSocket endpoint - connect directly to backend"
-}

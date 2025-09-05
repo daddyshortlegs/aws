@@ -1,13 +1,12 @@
 use crate::vm_db::{delete_vm_by_id, get_vm_by_id, list_vms, store_vm_info, VmInfo};
+use crate::qemu::vm_start;
 use axum::{http::StatusCode, response::IntoResponse, Json};
 use nix::sys::signal::{kill, Signal};
 use nix::unistd::Pid;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
-use std::io;
 use std::path::PathBuf;
 use tokio::fs;
-use tokio::process::Command;
 use uuid::Uuid;
 use crate::config::Config;
 
@@ -54,26 +53,8 @@ pub async fn launch_vm(
     // Generate random port in ephemeral range (49152-65535)
     let ssh_port = rand::thread_rng().gen_range(49152..65535);
 
-    // Execute QEMU command
-    let mut cmd = Command::new("qemu-system-x86_64");
-    cmd.args([
-        "-m",
-        "8192",
-        "-smp",
-        "6",
-        "-drive",
-        &format!("file={}", target_qcow2.to_str().unwrap()),
-        "-boot",
-        "d",
-        "-vga",
-        "virtio",
-        "-netdev",
-        &format!("user,id=net0,hostfwd=tcp::{}:-:22", ssh_port),
-        "-device",
-        "e1000,netdev=net0",
-    ]);
 
-    let output = cmd.spawn();
+    let output = vm_start(&target_qcow2.to_str().unwrap(), ssh_port);
 
     match output {
         Ok(child) => {
