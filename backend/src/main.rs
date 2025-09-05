@@ -9,7 +9,7 @@ mod vm_db;
 mod config;
 mod vm_service;
 mod qemu;
-use vm_service::{delete_vm_handler, launch_vm, list_vms_handler};
+use vm_service::{delete_vm_handler, launch_vm, list_vms_handler, start_all_vms};
 
 #[tokio::main]
 async fn main() {
@@ -37,6 +37,8 @@ async fn main() {
         .route("/list-vms", get(list_vms_handler))
         .route("/delete-vm", delete(delete_vm_handler))
         .layer(cors);
+
+    start_all_vms().await;
 
     // Run it
     let listener = tokio::net::TcpListener::bind("127.0.0.1:8081")

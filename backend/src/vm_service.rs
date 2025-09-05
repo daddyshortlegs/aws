@@ -105,6 +105,27 @@ pub async fn list_vms_handler() -> impl IntoResponse {
     }
 }
 
+pub async fn start_all_vms() {
+    let vms = list_vms().unwrap();
+
+    for vm in vms {
+        let vm_info = get_vm_by_id(&vm.id).unwrap();
+        let ssh_port = vm_info.unwrap().ssh_port;
+        let qcow2_file = Config::get_vms_dir().join(format!("{}.qcow2", vm.name));
+        let output = vm_start(qcow2_file.to_str().unwrap(), ssh_port);
+        match output {
+            Ok(child) => {
+                println!("VM {} started with PID: {}", vm.name, child.id().unwrap());
+            }
+            Err(e) => {
+                println!("Failed to start VM {}: {}", vm.name, e);
+            }
+        }
+    }
+}
+
+
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct DeleteVmRequest {
     pub id: String,
