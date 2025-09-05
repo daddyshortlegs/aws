@@ -21,17 +21,14 @@ async fn main() {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
-    // Load configuration
     let config = config::Config::load().expect("Failed to load configuration");
     tracing::info!("Loaded configuration: {:?}", config);
 
-    // Configure CORS
     let cors = CorsLayer::new()
         .allow_origin(Any)
         .allow_methods(Any)
         .allow_headers(Any);
 
-    // Build our application with a route
     let app = Router::new()
         .route("/launch-vm", post(launch_vm))
         .route("/list-vms", get(list_vms_handler))

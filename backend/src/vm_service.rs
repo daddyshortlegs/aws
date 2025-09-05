@@ -109,12 +109,24 @@ pub async fn start_all_vms() {
     let vms = list_vms().unwrap();
 
     for vm in vms {
-        let vm_info = get_vm_by_id(&vm.id).unwrap();
-        let ssh_port = vm_info.unwrap().ssh_port;
-        let qcow2_file = Config::get_vms_dir().join(format!("{}.qcow2", vm.name));
+        let vm_info = get_vm_by_id(&vm.id).unwrap().unwrap();
+        let uuid = vm_info.id;
+        let vm_name = vm_info.name;
+        let ssh_port = vm_info.ssh_port;
+        let qcow2_file = Config::get_vms_dir().join(format!("{}.qcow2", vm_name));
         let output = vm_start(qcow2_file.to_str().unwrap(), ssh_port);
         match output {
             Ok(child) => {
+    
+                let vm_info = VmInfo {
+                    id: uuid,
+                    name: vm_name,
+                    ssh_port: ssh_port,
+                    pid: child.id().unwrap(),
+                };
+    
+                store_vm_info(&vm_info);
+    
                 println!("VM {} started with PID: {}", vm.name, child.id().unwrap());
             }
             Err(e) => {
