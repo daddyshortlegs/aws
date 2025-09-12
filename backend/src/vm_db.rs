@@ -11,12 +11,12 @@ pub struct VmInfo {
     pub pid: u32,
 }
 
-pub fn store_vm_info(vm_info: &VmInfo) -> std::io::Result<()> {
+pub fn store_vm_info(vm_info: VmInfo) -> std::io::Result<()> {
     println!("Storing VM info: {:?}", vm_info);
 
     let file_path = create_file_path(&vm_info.id)?;
 
-    let json = serde_json::to_string_pretty(vm_info)?;
+    let json = serde_json::to_string_pretty(&vm_info)?;
     println!("Writing VM info to: {:?}", file_path);
     println!("VM info: {:?}", json);
     fs::write(file_path, json)

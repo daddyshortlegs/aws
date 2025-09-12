@@ -81,7 +81,7 @@ pub async fn launch_vm(
                 pid: child.id().unwrap(),
             };
 
-            store_vm_info(&vm_info);
+            store_vm_info(vm_info);
 
             (StatusCode::OK, Json(response))
         }
@@ -125,7 +125,7 @@ pub async fn start_all_vms() {
                     pid: child.id().unwrap(),
                 };
     
-                store_vm_info(&vm_info);
+                store_vm_info(vm_info);
     
                 println!("VM {} started with PID: {}", vm.name, child.id().unwrap());
             }

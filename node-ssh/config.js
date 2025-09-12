@@ -17,7 +17,7 @@ module.exports = {
   
   // Terminal configuration
   terminal: {
-    cols: 80,
+    cols: 120,
     rows: 30,
     name: 'xterm-color',
   },
