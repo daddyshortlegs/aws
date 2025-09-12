@@ -3,7 +3,7 @@ module.exports = {
   ssh: {
     host: process.env.SSH_HOST || 'localhost',
     port: process.env.SSH_PORT || 57757,
-    user: process.env.SSH_USER || 'andy',
+    user: process.env.SSH_USER || 'alpine',
     // Add more SSH options as needed
     // key: process.env.SSH_KEY_PATH,
     // password: process.env.SSH_PASSWORD,

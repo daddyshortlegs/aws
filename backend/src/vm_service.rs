@@ -30,12 +30,13 @@ pub async fn launch_vm(
     Json(payload): Json<LaunchVmRequest>,
 ) -> (StatusCode, Json<LaunchVmResponse>) {
     let current_dir = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-    let source_qcow2 = current_dir.join("ubuntu.qcow2");
+    let source_qcow2 = current_dir.join("alpine.qcow2");
 
     let config = Config::load().expect("Failed to load configuration");
     let target_qcow2 = config.storage.qcow2_dir.join(format!("{}.qcow2", payload.name));
 
 
+    println!("source_qcow2: {:?}", source_qcow2);
     println!("target_qcow2: {:?}", target_qcow2);
 
     // Copy the QCOW2 file

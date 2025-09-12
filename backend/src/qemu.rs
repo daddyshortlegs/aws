@@ -14,7 +14,7 @@ pub fn vm_start(qcow2_file: &str, ssh_port: u16) -> Result<Child, std::io::Error
         "-vga",
         "virtio",
         "-netdev",
-        &format!("user,id=net0,hostfwd=tcp::{}:-:22", ssh_port),
+        &format!("user,id=net0,hostfwd=tcp::{}-:22", ssh_port),
         "-device",
         "e1000,netdev=net0",
     ]);
