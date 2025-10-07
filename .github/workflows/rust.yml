@@ -36,6 +36,11 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-cargo-
     
+    - name: Create VM data directory
+      run: |
+        sudo mkdir -p /tmp/vm-data
+        sudo chmod 777 /tmp/vm-data
+
     - name: Build
       run: cargo build --verbose
     
