@@ -1,5 +1,6 @@
-use crate::vm_db::{delete_vm_by_id, get_vm_by_id, list_vms, store_vm_info, VmInfo};
+use crate::config::Config;
 use crate::qemu::vm_start;
+use crate::vm_db::{delete_vm_by_id, get_vm_by_id, list_vms, store_vm_info, VmInfo};
 use axum::{http::StatusCode, response::IntoResponse, Json};
 use nix::sys::signal::{kill, Signal};
 use nix::unistd::Pid;
@@ -8,7 +9,6 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use tokio::fs;
 use uuid::Uuid;
-use crate::config::Config;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct LaunchVmRequest {
@@ -33,8 +33,10 @@ pub async fn launch_vm(
     let source_qcow2 = current_dir.join("alpine.qcow2");
 
     let config = Config::load().expect("Failed to load configuration");
-    let target_qcow2 = config.storage.qcow2_dir.join(format!("{}.qcow2", payload.name));
-
+    let target_qcow2 = config
+        .storage
+        .qcow2_dir
+        .join(format!("{}.qcow2", payload.name));
 
     println!("source_qcow2: {source_qcow2:?}");
     println!("target_qcow2: {target_qcow2:?}");
@@ -54,15 +56,12 @@ pub async fn launch_vm(
     // Generate random port in ephemeral range (49152-65535)
     let ssh_port = rand::thread_rng().gen_range(49152..65535);
 
-
     let output = vm_start(target_qcow2.to_str().unwrap(), ssh_port);
 
     match output {
         Ok(child) => {
             // generate random uuid
             let uuid = Uuid::new_v4();
-
-
 
             let response = LaunchVmResponse {
                 success: true,
@@ -82,7 +81,7 @@ pub async fn launch_vm(
                 pid: child.id().unwrap(),
             };
 
-            let _ =store_vm_info(&vm_info);
+            let _ = store_vm_info(&vm_info);
 
             (StatusCode::OK, Json(response))
         }
@@ -118,16 +117,15 @@ pub async fn start_all_vms() {
         let output = vm_start(qcow2_file.to_str().unwrap(), ssh_port);
         match output {
             Ok(child) => {
-    
                 let vm_info = VmInfo {
                     id: uuid,
                     name: vm_name,
                     ssh_port,
                     pid: child.id().unwrap(),
                 };
-    
+
                 let _ = store_vm_info(&vm_info);
-    
+
                 println!("VM {} started with PID: {}", vm.name, child.id().unwrap());
             }
             Err(e) => {
@@ -136,8 +134,6 @@ pub async fn start_all_vms() {
         }
     }
 }
-
-
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct DeleteVmRequest {
@@ -162,7 +158,10 @@ pub async fn delete_vm_handler(Json(payload): Json<DeleteVmRequest>) -> impl Int
 
                     // Delete the JSON file using the same path as other operations
                     let config = Config::load().expect("Failed to load configuration");
-                    let file_path = config.storage.metadata_dir.join(format!("{}.json", vm_info.id));
+                    let file_path = config
+                        .storage
+                        .metadata_dir
+                        .join(format!("{}.json", vm_info.id));
 
                     if let Err(e) = fs::remove_file(&file_path).await {
                         println!("Error deleting VM info file: {file_path:?} - {e}");
@@ -174,8 +173,11 @@ pub async fn delete_vm_handler(Json(payload): Json<DeleteVmRequest>) -> impl Int
                     }
 
                     // Delete the corresponding QCOW2 file
-                    let qcow2_file_path = config.storage.qcow2_dir.join(format!("{}.qcow2", vm_info.name));
-                    
+                    let qcow2_file_path = config
+                        .storage
+                        .qcow2_dir
+                        .join(format!("{}.qcow2", vm_info.name));
+
                     if let Err(e) = fs::remove_file(&qcow2_file_path).await {
                         println!("Warning: Could not delete QCOW2 file: {qcow2_file_path:?} - {e}");
                         // Don't fail the entire operation if QCOW2 deletion fails

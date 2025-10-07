@@ -5,10 +5,10 @@ use axum::{
 use tower_http::cors::{Any, CorsLayer};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-mod vm_db;
 mod config;
-mod vm_service;
 mod qemu;
+mod vm_db;
+mod vm_service;
 use vm_service::{delete_vm_handler, launch_vm, list_vms_handler, start_all_vms};
 
 #[tokio::main]

@@ -1,4 +1,4 @@
-use tokio::process::{Command, Child};
+use tokio::process::{Child, Command};
 
 pub fn vm_start(qcow2_file: &str, ssh_port: u16) -> Result<Child, std::io::Error> {
     let mut cmd = Command::new("qemu-system-x86_64");

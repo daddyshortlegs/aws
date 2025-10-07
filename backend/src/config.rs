@@ -31,4 +31,4 @@ impl Config {
         let config = Self::load().expect("Failed to load configuration");
         config.storage.metadata_dir
     }
-} 
+}

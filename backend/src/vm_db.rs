@@ -1,7 +1,7 @@
+use crate::config::Config;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
-use crate::config::Config;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct VmInfo {
@@ -108,10 +108,10 @@ mod tests {
     fn test_store_and_get_vm() {
         let test_dir = setup_test_env();
         let vm = create_test_vm("test-1", "Test VM 1");
-        
+
         // Store the VM info
         store_vm_info(&vm).unwrap();
-        
+
         // Get the VM info
         let retrieved = get_vm_by_id("test-1").unwrap().unwrap();
         assert_eq!(retrieved.id, vm.id);
@@ -132,14 +132,14 @@ mod tests {
         let test_dir = setup_test_env();
         let vm1 = create_test_vm("test-2", "Test VM 2");
         let vm2 = create_test_vm("test-3", "Test VM 3");
-        
+
         // Store multiple VMs
         store_vm_info(&vm1).unwrap();
         store_vm_info(&vm2).unwrap();
-        
+
         // List VMs
         let vms = list_vms().unwrap();
-        
+
         // Verify the VMs are in the list
         let ids: Vec<String> = vms.iter().map(|v| v.id.clone()).collect();
         assert!(ids.contains(&vm1.id));
@@ -150,14 +150,14 @@ mod tests {
     fn test_delete_vm() {
         let test_dir = setup_test_env();
         let vm = create_test_vm("test-4", "Test VM 4");
-        
+
         // Store the VM
         store_vm_info(&vm).unwrap();
-        
+
         // Delete the VM
         let result = delete_vm_by_id("test-4").unwrap();
         assert!(result.is_none());
-        
+
         // Verify it's gone
         let result = get_vm_by_id("test-4").unwrap();
         assert!(result.is_none());
