@@ -1,0 +1,5 @@
+[storage]
+# Directory where QCOW2 files are stored
+qcow2_dir = "/tmp/vm-data"
+# Directory where VM metadata JSON files are stored
+metadata_dir = "/tmp/vm-data" 

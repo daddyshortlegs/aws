@@ -14,8 +14,14 @@ pub struct Config {
 
 impl Config {
     pub fn load() -> Result<Self, config::ConfigError> {
+        let config_file = if std::env::var("CI").is_ok() {
+            "config.ci"
+        } else {
+            "config"
+        };
+
         let config = config::Config::builder()
-            .add_source(config::File::with_name("config"))
+            .add_source(config::File::with_name(config_file))
             .build()?;
 
         config.try_deserialize()
