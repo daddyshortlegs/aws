@@ -11,7 +11,7 @@ pub struct VmInfo {
     pub pid: u32,
 }
 
-pub fn store_vm_info(vm_info: VmInfo) -> std::io::Result<()> {
+pub fn store_vm_info(vm_info: &VmInfo) -> std::io::Result<()> {
     println!("Storing VM info: {:?}", vm_info);
 
     let file_path = create_file_path(&vm_info.id)?;
