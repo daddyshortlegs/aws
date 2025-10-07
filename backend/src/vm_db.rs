@@ -12,13 +12,13 @@ pub struct VmInfo {
 }
 
 pub fn store_vm_info(vm_info: &VmInfo) -> std::io::Result<()> {
-    println!("Storing VM info: {:?}", vm_info);
+    println!("Storing VM info: {vm_info:?}");
 
     let file_path = create_file_path(&vm_info.id)?;
 
     let json = serde_json::to_string_pretty(&vm_info)?;
-    println!("Writing VM info to: {:?}", file_path);
-    println!("VM info: {:?}", json);
+    println!("Writing VM info to: {file_path:?}");
+    println!("VM info: {json:?}");
     fs::write(file_path, json)
 }
 
@@ -73,7 +73,7 @@ pub fn delete_vm_by_id(id: &str) -> std::io::Result<Option<VmInfo>> {
 
 fn create_file_path(id: &str) -> std::io::Result<PathBuf> {
     let vms_dir = Config::get_vms_dir();
-    let file_path = vms_dir.join(format!("{}.json", id));
+    let file_path = vms_dir.join(format!("{id}.json"));
     Ok(file_path)
 }
 

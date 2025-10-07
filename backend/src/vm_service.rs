@@ -36,14 +36,14 @@ pub async fn launch_vm(
     let target_qcow2 = config.storage.qcow2_dir.join(format!("{}.qcow2", payload.name));
 
 
-    println!("source_qcow2: {:?}", source_qcow2);
-    println!("target_qcow2: {:?}", target_qcow2);
+    println!("source_qcow2: {source_qcow2:?}");
+    println!("target_qcow2: {target_qcow2:?}");
 
     // Copy the QCOW2 file
     if let Err(e) = fs::copy(&source_qcow2, &target_qcow2).await {
         let response = LaunchVmResponse {
             success: false,
-            message: format!("Failed to copy QCOW2 file: {}", e),
+            message: format!("Failed to copy QCOW2 file: {e}"),
             instance_id: None,
             ssh_port: None,
             pid: None,
@@ -55,7 +55,7 @@ pub async fn launch_vm(
     let ssh_port = rand::thread_rng().gen_range(49152..65535);
 
 
-    let output = vm_start(&target_qcow2.to_str().unwrap(), ssh_port);
+    let output = vm_start(target_qcow2.to_str().unwrap(), ssh_port);
 
     match output {
         Ok(child) => {
@@ -78,18 +78,18 @@ pub async fn launch_vm(
             let vm_info = VmInfo {
                 id: uuid.to_string(),
                 name: payload.name,
-                ssh_port: ssh_port,
+                ssh_port,
                 pid: child.id().unwrap(),
             };
 
-            store_vm_info(&vm_info);
+            let _ =store_vm_info(&vm_info);
 
             (StatusCode::OK, Json(response))
         }
         Err(e) => {
             let response = LaunchVmResponse {
                 success: false,
-                message: format!("Failed to launch VM: {}", e),
+                message: format!("Failed to launch VM: {e}"),
                 instance_id: None,
                 ssh_port: None,
                 pid: None,
@@ -114,7 +114,7 @@ pub async fn start_all_vms() {
         let uuid = vm_info.id;
         let vm_name = vm_info.name;
         let ssh_port = vm_info.ssh_port;
-        let qcow2_file = Config::get_vms_dir().join(format!("{}.qcow2", vm_name));
+        let qcow2_file = Config::get_vms_dir().join(format!("{vm_name}.qcow2"));
         let output = vm_start(qcow2_file.to_str().unwrap(), ssh_port);
         match output {
             Ok(child) => {
@@ -122,11 +122,11 @@ pub async fn start_all_vms() {
                 let vm_info = VmInfo {
                     id: uuid,
                     name: vm_name,
-                    ssh_port: ssh_port,
+                    ssh_port,
                     pid: child.id().unwrap(),
                 };
     
-                store_vm_info(&vm_info);
+                let _ = store_vm_info(&vm_info);
     
                 println!("VM {} started with PID: {}", vm.name, child.id().unwrap());
             }
@@ -145,7 +145,7 @@ pub struct DeleteVmRequest {
 }
 
 pub async fn delete_vm_handler(Json(payload): Json<DeleteVmRequest>) -> impl IntoResponse {
-    println!("Deleting VM: {:?}", payload);
+    println!("Deleting VM: {payload:?}");
 
     match get_vm_by_id(&payload.id) {
         Ok(Some(vm_info)) => {
@@ -156,7 +156,7 @@ pub async fn delete_vm_handler(Json(payload): Json<DeleteVmRequest>) -> impl Int
                     tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
 
                     // Check if process is still running, if so, force kill it
-                    if let Ok(_) = kill(Pid::from_raw(vm_info.pid as i32), Signal::SIGKILL) {
+                    if kill(Pid::from_raw(vm_info.pid as i32), Signal::SIGKILL).is_ok() {
                         println!("Process {} was still running, force killed", vm_info.pid);
                     }
 
@@ -165,7 +165,7 @@ pub async fn delete_vm_handler(Json(payload): Json<DeleteVmRequest>) -> impl Int
                     let file_path = config.storage.metadata_dir.join(format!("{}.json", vm_info.id));
 
                     if let Err(e) = fs::remove_file(&file_path).await {
-                        println!("Error deleting VM info file: {:?} - {}", file_path, e);
+                        println!("Error deleting VM info file: {file_path:?} - {e}");
                         return (
                             StatusCode::INTERNAL_SERVER_ERROR,
                             "Failed to delete VM info file",
@@ -177,14 +177,14 @@ pub async fn delete_vm_handler(Json(payload): Json<DeleteVmRequest>) -> impl Int
                     let qcow2_file_path = config.storage.qcow2_dir.join(format!("{}.qcow2", vm_info.name));
                     
                     if let Err(e) = fs::remove_file(&qcow2_file_path).await {
-                        println!("Warning: Could not delete QCOW2 file: {:?} - {}", qcow2_file_path, e);
+                        println!("Warning: Could not delete QCOW2 file: {qcow2_file_path:?} - {e}");
                         // Don't fail the entire operation if QCOW2 deletion fails
                         // The JSON metadata is more important to clean up
                     } else {
-                        println!("Successfully deleted QCOW2 file: {:?}", qcow2_file_path);
+                        println!("Successfully deleted QCOW2 file: {qcow2_file_path:?}");
                     }
 
-                    delete_vm_by_id(&vm_info.id);
+                    let _ = delete_vm_by_id(&vm_info.id);
 
                     (StatusCode::OK, "VM successfully terminated and removed").into_response()
                 }
@@ -192,7 +192,7 @@ pub async fn delete_vm_handler(Json(payload): Json<DeleteVmRequest>) -> impl Int
                     println!("Error terminating process {}: {}", vm_info.pid, e);
                     (
                         StatusCode::INTERNAL_SERVER_ERROR,
-                        format!("Failed to terminate VM: {}", e),
+                        format!("Failed to terminate VM: {e}"),
                     )
                         .into_response()
                 }
@@ -200,10 +200,10 @@ pub async fn delete_vm_handler(Json(payload): Json<DeleteVmRequest>) -> impl Int
         }
         Ok(None) => (StatusCode::NOT_FOUND, "VM not found").into_response(),
         Err(e) => {
-            println!("Error retrieving VM info: {}", e);
+            println!("Error retrieving VM info: {e}");
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Error retrieving VM info: {}", e),
+                format!("Error retrieving VM info: {e}"),
             )
                 .into_response()
         }
