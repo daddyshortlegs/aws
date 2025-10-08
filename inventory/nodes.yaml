@@ -1,0 +1,4 @@
+[cluster]
+pc1 ansible_host=10.0.0.1
+pc2 ansible_host=10.0.0.2
+pc3 ansible_host=10.0.0.3

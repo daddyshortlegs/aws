@@ -1,0 +1,8 @@
+- name: Setup nodes
+  hosts: cluster
+  tasks:
+   - name: Copy backend binary
+     ansible.builtin.copy:
+       src: target/release/vm-launcher 
+       dest: /home/andy
+
