@@ -1,0 +1,8 @@
+- name: Setup controller
+  hosts: controller
+  tasks:
+   - name: Copy proxy binary
+     ansible.builtin.copy:
+       src: target/release/proxy
+       dest: /home/andy
+

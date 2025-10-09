@@ -1,5 +1,5 @@
 - name: Setup nodes
-  hosts: cluster
+  hosts: workers
   tasks:
    - name: Copy backend binary
      ansible.builtin.copy:
