@@ -1,5 +1,11 @@
 # Andy's Web Services
 
+To build for a Linux taget (if on Mac):
+
+```
+cargo build --target x86_64-unknown-linux-gnu --release
+```
+
 To run:
 
 ```
