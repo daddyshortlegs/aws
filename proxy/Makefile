@@ -1,4 +1,4 @@
-.PHONY: build deploy all
+.PHONY: build deploy all clean
 
 # Build target - build in Debian Linux container (x86_64)
 build:
@@ -12,6 +12,9 @@ build:
 
 deploy:
 	ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -i ../inventory/nodes.yaml deploy-proxy.yaml -u andy -K --ask-pass
+
+clean:
+	rm -rf target
 
 all: build deploy
 
