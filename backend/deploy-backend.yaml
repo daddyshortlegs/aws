@@ -3,6 +3,6 @@
   tasks:
    - name: Copy backend binary
      ansible.builtin.copy:
-       src: target/release/vm-launcher 
+       src: target/x86_64-unknown-linux-gnu/release/vm-launcher
        dest: /home/andy
 
