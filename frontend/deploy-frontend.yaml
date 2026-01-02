@@ -1,0 +1,24 @@
+- name: Setup nodes
+  hosts: workers
+  become: yes
+  tasks:
+   - name: Install nginx
+     ansible.builtin.apt:
+       name: nginx
+       state: present
+       update_cache: yes
+
+   - name: Enable and start nginx service
+     ansible.builtin.systemd:
+       name: nginx
+       enabled: yes
+       state: started
+
+   - name: Copy build files to nginx web root
+     ansible.builtin.copy:
+       src: build/
+       dest: /var/www/html
+       mode: '0644'
+       owner: www-data
+       group: www-data
+       directory_mode: '0755'
