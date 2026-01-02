@@ -3,15 +3,21 @@
   tasks:
    - name: Create aws directory
      ansible.builtin.file:
-       path: /home/andy/aws/backend
+       path: "{{ item }}"
        state: directory
        mode: '0755'
+     with_items:
+       - /home/andy/aws/backend
+       - /home/andy/aws/vm-data
 
-   - name: Copy backend binary
+   - name: Copy server
      ansible.builtin.copy:
-       src: target/release/vm-launcher
-       dest: /home/andy/aws/backend/vm-launcher
+       src: "{{ item }}"
+       dest: /home/andy/aws/backend/
        mode: '0755'
+     with_items:
+       - target/release/vm-launcher
+       - alpine.qcow2
 
    - name: Copy config file
      ansible.builtin.copy:
