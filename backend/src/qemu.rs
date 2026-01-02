@@ -17,6 +17,7 @@ pub fn vm_start(qcow2_file: &str, ssh_port: u16) -> Result<Child, std::io::Error
         &format!("user,id=net0,hostfwd=tcp::{ssh_port}-:22"),
         "-device",
         "e1000,netdev=net0",
+        "-nographic"
     ]);
 
     cmd.spawn()

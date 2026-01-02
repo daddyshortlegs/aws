@@ -1,6 +1,5 @@
 - name: Setup nodes
   hosts: workers
-  become: yes
   tasks:
    - name: Create aws directory
      ansible.builtin.file:
@@ -40,18 +39,21 @@
          Restart=always
          RestartSec=10
          Environment="RUST_LOG=info"
-
+         Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
          [Install]
          WantedBy=multi-user.target
        dest: /etc/systemd/system/vm-launcher.service
        mode: '0644'
+     become: yes
 
    - name: Reload systemd daemon
      ansible.builtin.systemd:
        daemon_reload: yes
+     become: yes
 
    - name: Enable and start Rust backend service
      ansible.builtin.systemd:
        name: vm-launcher
        enabled: yes
        state: restarted
+     become: yes
