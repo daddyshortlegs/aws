@@ -20,39 +20,20 @@
 
    - name: Copy server.js
      ansible.builtin.copy:
-       src: server.js
-       dest: /home/andy/aws/node-ssh/server.js
+       src: "{{ item }}"
+       dest: /home/andy/aws/node-ssh/
        mode: '0644'
        owner: andy
        group: andy
-
-   - name: Copy config.js
-     ansible.builtin.copy:
-       src: config.js
-       dest: /home/andy/aws/node-ssh/config.js
-       mode: '0644'
-       owner: andy
-       group: andy
-
-   - name: Copy package.json
-     ansible.builtin.copy:
-       src: package.json
-       dest: /home/andy/aws/node-ssh/package.json
-       mode: '0644'
-       owner: andy
-       group: andy
-
-   - name: Copy package-lock.json
-     ansible.builtin.copy:
-       src: package-lock.json
-       dest: /home/andy/aws/node-ssh/package-lock.json
-       mode: '0644'
-       owner: andy
-       group: andy
+     with_items:
+      - server.js
+      - config.js
+      - package.json
+      - package-lock.json
 
    - name: Install npm dependencies
      ansible.builtin.command:
-       cmd: npm ci --production
+       cmd: npm ci --only=production
        chdir: /home/andy/aws/node-ssh
      become_user: andy
 
