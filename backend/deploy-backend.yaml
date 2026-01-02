@@ -3,18 +3,18 @@
   tasks:
    - name: Create aws directory
      ansible.builtin.file:
-       path: /home/andy/aws
+       path: /home/andy/aws/backend
        state: directory
        mode: '0755'
 
    - name: Copy backend binary
      ansible.builtin.copy:
        src: target/x86_64-unknown-linux-gnu/release/vm-launcher
-       dest: /home/andy/aws/vm-launcher
+       dest: /home/andy/aws/backend/vm-launcher
        mode: '0755'
 
    - name: Copy config file
      ansible.builtin.copy:
        src: config.ci.toml
-       dest: /home/andy/aws/config.toml
+       dest: /home/andy/aws/backend/config.toml
 
