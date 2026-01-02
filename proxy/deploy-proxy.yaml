@@ -4,20 +4,20 @@
   tasks:
    - name: Create aws directory
      ansible.builtin.file:
-       path: /home/andy/aws/proxy
+       path: "{{ aws_base_path }}/proxy"
        state: directory
        mode: '0755'
 
    - name: Copy proxy binary
      ansible.builtin.copy:
        src: target/release/proxy
-       dest: /home/andy/aws/proxy
+       dest: "{{ aws_base_path }}/proxy/"
        mode: '0755'
 
    - name: Copy config file
      ansible.builtin.copy:
        src: config.toml
-       dest: /home/andy/aws/proxy/config.toml
+       dest: "{{ aws_base_path }}/proxy/config.toml"
 
    - name: Create systemd service file
      ansible.builtin.copy:
@@ -29,8 +29,8 @@
          [Service]
          Type=simple
          User=andy
-         WorkingDirectory=/home/andy/aws/proxy
-         ExecStart=/home/andy/aws/proxy/proxy
+         WorkingDirectory={{ aws_base_path }}/proxy
+         ExecStart={{ aws_base_path }}/proxy/proxy
          Restart=always
          RestartSec=10
          Environment="RUST_LOG=info"

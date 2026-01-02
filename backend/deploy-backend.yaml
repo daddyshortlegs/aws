@@ -7,13 +7,13 @@
        state: directory
        mode: '0755'
      with_items:
-       - /home/andy/aws/backend
-       - /home/andy/aws/vm-data
+       - "{{ aws_base_path }}/backend"
+       - "{{ aws_base_path }}/vm-data"
 
    - name: Copy server
      ansible.builtin.copy:
        src: "{{ item }}"
-       dest: /home/andy/aws/backend/
+       dest: "{{ aws_base_path }}/backend/"
        mode: '0755'
      with_items:
        - target/release/vm-launcher
@@ -22,7 +22,7 @@
    - name: Copy config file
      ansible.builtin.copy:
        src: config.ci.toml
-       dest: /home/andy/aws/backend/config.toml
+       dest: "{{ aws_base_path }}/backend/config.toml"
 
    - name: Create systemd service file
      ansible.builtin.copy:
@@ -34,8 +34,8 @@
          [Service]
          Type=simple
          User=andy
-         WorkingDirectory=/home/andy/aws/backend
-         ExecStart=/home/andy/aws/backend/vm-launcher
+         WorkingDirectory={{ aws_base_path }}/backend
+         ExecStart={{ aws_base_path }}/backend/vm-launcher
          Restart=always
          RestartSec=10
          Environment="RUST_LOG=info"

@@ -12,7 +12,7 @@
 
    - name: Create aws/node-ssh directory
      ansible.builtin.file:
-       path: /home/andy/aws/node-ssh
+       path: "{{ aws_base_path }}/node-ssh"
        state: directory
        mode: '0755'
        owner: andy
@@ -21,7 +21,7 @@
    - name: Copy server.js
      ansible.builtin.copy:
        src: "{{ item }}"
-       dest: /home/andy/aws/node-ssh/
+       dest: "{{ aws_base_path }}/node-ssh/"
        mode: '0644'
        owner: andy
        group: andy
@@ -34,7 +34,7 @@
    - name: Install npm dependencies
      ansible.builtin.command:
        cmd: npm ci --only=production
-       chdir: /home/andy/aws/node-ssh
+       chdir: "{{ aws_base_path }}/node-ssh"
      become_user: andy
 
    - name: Get node binary path
@@ -59,8 +59,8 @@
          [Service]
          Type=simple
          User=andy
-         WorkingDirectory=/home/andy/aws/node-ssh
-         ExecStart={{ node_path_result.stdout }} /home/andy/aws/node-ssh/server.js
+         WorkingDirectory={{ aws_base_path }}/node-ssh
+         ExecStart={{ node_path_result.stdout }} {{ aws_base_path }}/node-ssh/server.js
          Restart=always
          RestartSec=10
          Environment="NODE_ENV=production"
