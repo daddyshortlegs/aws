@@ -1,4 +1,5 @@
 - name: Setup controller
+  become: yes
   hosts: controller
   tasks:
    - name: Create aws directory
@@ -17,3 +18,34 @@
      ansible.builtin.copy:
        src: config.toml
        dest: /home/andy/aws/proxy/config.toml
+
+   - name: Create systemd service file
+     ansible.builtin.copy:
+       content: |
+         [Unit]
+         Description=Proxy Rust Server
+         After=network.target
+
+         [Service]
+         Type=simple
+         User=andy
+         WorkingDirectory=/home/andy/aws/proxy
+         ExecStart=/home/andy/aws/proxy/proxy
+         Restart=always
+         RestartSec=10
+         Environment="RUST_LOG=info"
+
+         [Install]
+         WantedBy=multi-user.target
+       dest: /etc/systemd/system/proxy.service
+       mode: '0644'
+
+   - name: Reload systemd daemon
+     ansible.builtin.systemd:
+       daemon_reload: yes
+
+   - name: Enable and start Rust backend service
+     ansible.builtin.systemd:
+       name: proxy
+       enabled: yes
+       state: restarted
