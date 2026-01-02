@@ -1,8 +1,14 @@
 .PHONY: build deploy all
 
-# Build target - cross-compile for Linux x86_64
+# Build target - build in Debian Linux container (x86_64)
 build:
-	cargo build --target x86_64-unknown-linux-gnu --release
+	mkdir -p target
+	podman run --rm --platform linux/amd64 \
+		-v "$(PWD):/workspace" \
+		-v "$(PWD)/target:/workspace/target" \
+		-w /workspace \
+		rust:1-bookworm \
+		cargo build --release
 
 deploy:
 	ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -i ../inventory/nodes.yaml deploy-backend.yaml -u andy -K --ask-pass

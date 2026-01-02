@@ -9,7 +9,7 @@
 
    - name: Copy backend binary
      ansible.builtin.copy:
-       src: target/x86_64-unknown-linux-gnu/release/vm-launcher
+       src: target/release/vm-launcher
        dest: /home/andy/aws/backend/vm-launcher
        mode: '0755'
 
