@@ -1,0 +1,101 @@
+- name: Setup nodes
+  hosts: workers
+  become: yes
+  tasks:
+   - name: Install Node.js and npm
+     ansible.builtin.apt:
+       name:
+         - nodejs
+         - npm
+       state: present
+       update_cache: yes
+
+   - name: Create aws/node-ssh directory
+     ansible.builtin.file:
+       path: /home/andy/aws/node-ssh
+       state: directory
+       mode: '0755'
+       owner: andy
+       group: andy
+
+   - name: Copy server.js
+     ansible.builtin.copy:
+       src: server.js
+       dest: /home/andy/aws/node-ssh/server.js
+       mode: '0644'
+       owner: andy
+       group: andy
+
+   - name: Copy config.js
+     ansible.builtin.copy:
+       src: config.js
+       dest: /home/andy/aws/node-ssh/config.js
+       mode: '0644'
+       owner: andy
+       group: andy
+
+   - name: Copy package.json
+     ansible.builtin.copy:
+       src: package.json
+       dest: /home/andy/aws/node-ssh/package.json
+       mode: '0644'
+       owner: andy
+       group: andy
+
+   - name: Copy package-lock.json
+     ansible.builtin.copy:
+       src: package-lock.json
+       dest: /home/andy/aws/node-ssh/package-lock.json
+       mode: '0644'
+       owner: andy
+       group: andy
+
+   - name: Install npm dependencies
+     ansible.builtin.command:
+       cmd: npm ci --production
+       chdir: /home/andy/aws/node-ssh
+     become_user: andy
+
+   - name: Get node binary path
+     ansible.builtin.shell: |
+       if command -v node > /dev/null 2>&1; then
+         echo "$(command -v node)"
+       elif command -v nodejs > /dev/null 2>&1; then
+         echo "$(command -v nodejs)"
+       else
+         echo "/usr/bin/node"
+       fi
+     register: node_path_result
+     changed_when: false
+
+   - name: Create systemd service file
+     ansible.builtin.copy:
+       content: |
+         [Unit]
+         Description=SSH WebSocket Server
+         After=network.target
+
+         [Service]
+         Type=simple
+         User=andy
+         WorkingDirectory=/home/andy/aws/node-ssh
+         ExecStart={{ node_path_result.stdout }} /home/andy/aws/node-ssh/server.js
+         Restart=always
+         RestartSec=10
+         Environment="NODE_ENV=production"
+
+         [Install]
+         WantedBy=multi-user.target
+       dest: /etc/systemd/system/node-ssh.service
+       mode: '0644'
+
+   - name: Reload systemd daemon
+     ansible.builtin.systemd:
+       daemon_reload: yes
+
+   - name: Enable and start node-ssh service
+     ansible.builtin.systemd:
+       name: node-ssh
+       enabled: yes
+       state: restarted
+
