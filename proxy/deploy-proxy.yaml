@@ -1,8 +1,19 @@
 - name: Setup controller
   hosts: controller
   tasks:
+   - name: Create aws directory
+     ansible.builtin.file:
+       path: /home/andy/aws/proxy
+       state: directory
+       mode: '0755'
+
    - name: Copy proxy binary
      ansible.builtin.copy:
        src: target/release/proxy
-       dest: /home/andy
+       dest: /home/andy/aws/proxy
+       mode: '0755'
 
+   - name: Copy config file
+     ansible.builtin.copy:
+       src: config.toml
+       dest: /home/andy/aws/proxy/config.toml
