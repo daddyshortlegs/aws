@@ -1,24 +1,81 @@
 - name: Setup nodes
   hosts: workers
-  become: yes
   tasks:
-   - name: Install nginx
+   - name: Install Node.js and npm
      ansible.builtin.apt:
-       name: nginx
+       name:
+         - nodejs
+         - npm
        state: present
        update_cache: yes
+     become: yes
 
-   - name: Enable and start nginx service
-     ansible.builtin.systemd:
-       name: nginx
-       enabled: yes
-       state: started
+   - name: Create frontend directory
+     ansible.builtin.file:
+       path: "{{ aws_base_path }}/frontend"
+       state: directory
+       mode: '0755'
 
-   - name: Copy build files to nginx web root
+   - name: Copy build files
      ansible.builtin.copy:
        src: build/
-       dest: /var/www/html
+       dest: "{{ aws_base_path }}/frontend/"
        mode: '0644'
-       owner: www-data
-       group: www-data
        directory_mode: '0755'
+
+   - name: Get node binary path
+     ansible.builtin.shell: |
+       if command -v node > /dev/null 2>&1; then
+         echo "$(command -v node)"
+       elif command -v nodejs > /dev/null 2>&1; then
+         echo "$(command -v nodejs)"
+       else
+         echo "/usr/bin/node"
+       fi
+     register: node_path_result
+     changed_when: false
+
+   - name: Get npx binary path
+     ansible.builtin.shell: |
+       if command -v npx > /dev/null 2>&1; then
+         echo "$(command -v npx)"
+       else
+         echo "/usr/bin/npx"
+       fi
+     register: npx_path_result
+     changed_when: false
+
+   - name: Create systemd service file
+     ansible.builtin.copy:
+       content: |
+         [Unit]
+         Description=Frontend React Server
+         After=network.target
+
+         [Service]
+         Type=simple
+         User=andy
+         WorkingDirectory={{ aws_base_path }}/frontend
+         ExecStart={{ npx_path_result.stdout }} -y serve@latest -s -l 0.0.0.03000 {{ aws_base_path }}/frontend
+         Restart=always
+         RestartSec=10
+         Environment="NODE_ENV=production"
+         Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
+         [Install]
+         WantedBy=multi-user.target
+       dest: /etc/systemd/system/frontend.service
+       mode: '0644'
+     become: yes
+
+   - name: Reload systemd daemon
+     ansible.builtin.systemd:
+       daemon_reload: yes
+     become: yes
+
+   - name: Enable and start frontend service
+     ansible.builtin.systemd:
+       name: frontend
+       enabled: yes
+       state: restarted
+     become: yes
