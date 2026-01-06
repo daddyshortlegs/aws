@@ -10,6 +10,13 @@
        update_cache: yes
      become: yes
 
+   - name: Install nginx
+     ansible.builtin.apt:
+       name: nginx
+       state: present
+       update_cache: yes
+     become: yes
+
    - name: Create frontend directory
      ansible.builtin.file:
        path: "{{ aws_base_path }}/frontend"
@@ -56,7 +63,7 @@
          Type=simple
          User=andy
          WorkingDirectory={{ aws_base_path }}/frontend
-         ExecStart={{ npx_path_result.stdout }} -y serve@latest -s -l 0.0.0.03000 {{ aws_base_path }}/frontend
+         ExecStart={{ npx_path_result.stdout }} -y serve@latest -s -l 3000 {{ aws_base_path }}/frontend
          Restart=always
          RestartSec=10
          Environment="NODE_ENV=production"
@@ -76,6 +83,54 @@
    - name: Enable and start frontend service
      ansible.builtin.systemd:
        name: frontend
+       enabled: yes
+       state: restarted
+     become: yes
+
+   - name: Create nginx configuration for frontend
+     ansible.builtin.copy:
+       content: |
+         server {
+             listen 80;
+             server_name _;
+
+             location / {
+                 proxy_pass http://127.0.0.1:3000;
+                 proxy_http_version 1.1;
+                 proxy_set_header Upgrade $http_upgrade;
+                 proxy_set_header Connection 'upgrade';
+                 proxy_set_header Host $host;
+                 proxy_set_header X-Real-IP $remote_addr;
+                 proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                 proxy_set_header X-Forwarded-Proto $scheme;
+                 proxy_cache_bypass $http_upgrade;
+             }
+         }
+       dest: /etc/nginx/sites-available/frontend
+       mode: '0644'
+     become: yes
+
+   - name: Remove default nginx site
+     ansible.builtin.file:
+       path: /etc/nginx/sites-enabled/default
+       state: absent
+     become: yes
+
+   - name: Enable frontend nginx site
+     ansible.builtin.file:
+       src: /etc/nginx/sites-available/frontend
+       dest: /etc/nginx/sites-enabled/frontend
+       state: link
+     become: yes
+
+   - name: Test nginx configuration
+     ansible.builtin.command: nginx -t
+     become: yes
+     changed_when: false
+
+   - name: Enable and start nginx service
+     ansible.builtin.systemd:
+       name: nginx
        enabled: yes
        state: restarted
      become: yes
