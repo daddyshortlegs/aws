@@ -6,11 +6,19 @@ Supports both document queries and API operations.
 import os
 import subprocess
 import json
+
+from ollama import Client
+from ollama import ChatResponse
+
 from pathlib import Path
 from typing import List, Dict, Optional
 from sentence_transformers import SentenceTransformer
 import numpy as np
 import httpx
+
+client = Client(
+    host="http://localhost:11434"
+)
 
 class SimpleRAG:
     def __init__(self, model: str = "llama2", documents_dir: str = "documents", api_base_url: str = "http://127.0.0.1:8081"):
@@ -33,88 +41,49 @@ class SimpleRAG:
         self.embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
         print("Embedding model loaded!")
         
-        # Check if Ollama is available
-        self._check_ollama()
-    
-    def _check_ollama(self):
-        """Check if Ollama is installed and the model is available."""
-        try:
-            result = subprocess.run(
-                ['ollama', 'list'],
-                capture_output=True,
-                text=True,
-                timeout=5
-            )
-            if result.returncode != 0:
-                print("Warning: Ollama may not be installed or running.")
-                print("Install from: https://ollama.ai")
-                return
-            
-            # Check if model is available
-            if self.model not in result.stdout:
-                print(f"Model '{self.model}' not found. Pulling it now...")
-                subprocess.run(['ollama', 'pull', self.model], check=True)
-                print(f"Model '{self.model}' is ready!")
-            else:
-                print(f"Model '{self.model}' is available")
-        except FileNotFoundError:
-            print("Error: Ollama not found. Please install from https://ollama.ai")
-            raise
-        except subprocess.TimeoutExpired:
-            print("Warning: Ollama may not be running. Start it with: ollama serve")
-    
-    
-    def _query_ollama(self, prompt: str) -> str:
-        """Query Ollama with a prompt."""
-        try:
-            result = subprocess.run(
-                ['ollama', 'run', self.model, prompt],
-                capture_output=True,
-                text=True,
-                timeout=60
-            )
-            
-            if result.returncode != 0:
-                return f"Error: {result.stderr}"
-            
-            return result.stdout.strip()
-        except subprocess.TimeoutExpired:
-            return "Error: Request timed out"
-        except Exception as e:
-            return f"Error: {str(e)}"
-    
+ 
     def _detect_api_operation(self, question: str) -> Optional[Dict[str, any]]:
-        """
-        Use LLM to detect if the question is an API operation and extract parameters.
-        Returns None if not an API operation, or a dict with operation details.
-        """
-        prompt = f"""Analyze the following user question and determine if it's a request to perform an API operation on a VM management system.
 
-Available API operations:
-1. launch-vm: Create/launch a new VM. Requires: name (required), instance_type (optional, default: "t2.micro"), region (optional, default: "us-east-1")
-2. list-vms: List all VMs. No parameters needed.
-3. delete-vm: Delete a VM. Requires: id (the VM instance ID) or name (to find the ID first)
+        messages = [
+        {
+            'role': 'system',
+            'content': f"""You are a JSON-only API. Analyze the user question and determine if it's a request to perform an API operation on a VM management system.
 
-User question: "{question}"
+        Available API operations:
+        1. launch-vm: Create/launch a new VM. Requires: name (required), instance_type (optional, default: "t2.micro"), region (optional, default: "us-east-1")
+        2. list-vms: List all VMs. No parameters needed.
+        3. delete-vm: Delete a VM. Requires: id (the VM instance ID) or name (to find the ID first)
 
-Respond with ONLY a JSON object in this exact format (no other text):
-- If it's an API operation: {{"operation": "launch-vm"|"list-vms"|"delete-vm", "params": {{"name": "...", "instance_type": "...", "region": "...", "id": "..."}}}}
-- If it's NOT an API operation: {{"operation": null}}
+        CRITICAL: Respond with ONLY valid JSON. No markdown, no explanations, no code blocks, no extra text. Just the raw JSON object.
 
-Extract parameters from the question. If a parameter is not mentioned, use defaults:
-- instance_type: "t2.micro"
-- region: "us-east-1"
+        Format:
+        - If it's an API operation: {{"operation": "launch-vm"|"list-vms"|"delete-vm", "params": {{"name": "...", "instance_type": "...", "region": "...", "id": "..."}}}}
+        - If it's NOT an API operation: {{"operation": null}}
 
-Examples:
-- "create a VM called test-vm" -> {{"operation": "launch-vm", "params": {{"name": "test-vm", "instance_type": "t2.micro", "region": "us-east-1"}}}}
-- "list all VMs" -> {{"operation": "list-vms", "params": {{}}}}
-- "delete the VM with id abc123" -> {{"operation": "delete-vm", "params": {{"id": "abc123"}}}}
-- "what is a VM?" -> {{"operation": null}}
+        Extract parameters from the question. If a parameter is not mentioned, use defaults:
+        - instance_type: "t2.micro"
+        - region: "us-east-1"
 
-JSON response:"""
+        Examples:
+        - "create a VM called test-vm" -> {{"operation": "launch-vm", "params": {{"name": "test-vm", "instance_type": "t2.micro", "region": "us-east-1"}}}}
+        - "list all VMs" -> {{"operation": "list-vms", "params": {{}}}}
+        - "delete the VM with id abc123" -> {{"operation": "delete-vm", "params": {{"id": "abc123"}}}}
+        - "what is a VM?" -> {{"operation": null}}"""
+        },
+        {
+            'role': 'user',
+            'content': question,
+        },
+        ]
+
+
+        message: ChatResponse = client.chat('llama2', messages=messages)
         
-        response = self._query_ollama(prompt)
-        
+        response = message.message.content
+        print("response: ", response)
+
+
+
         # Try to extract JSON from response
         try:
             # Look for JSON in the response
@@ -287,7 +256,15 @@ JSON response:"""
         
         # Not an API operation - use Ollama to answer the question
         print(f"Querying {self.model} for general question...")
-        answer = self._query_ollama(question)
+
+        messages = [
+            {
+                'role': 'user',
+                'content': question
+            }
+        ]
+        response: ChatResponse = client.chat('llama2', messages=messages)
+        answer = response.message.content
         
         return {
             "answer": answer,
