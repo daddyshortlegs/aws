@@ -63,68 +63,6 @@ class SimpleRAG:
         except subprocess.TimeoutExpired:
             print("Warning: Ollama may not be running. Start it with: ollama serve")
     
-    def load_documents(self):
-        """Load all .txt files from the documents directory."""
-        if not self.documents_dir.exists():
-            self.documents_dir.mkdir(parents=True, exist_ok=True)
-            print(f"Created {self.documents_dir} directory. Add .txt files there.")
-            return
-        
-        txt_files = list(self.documents_dir.glob("*.txt"))
-        if not txt_files:
-            print(f"No .txt files found in {self.documents_dir}")
-            return
-        
-        self.documents = []
-        for file_path in txt_files:
-            with open(file_path, 'r', encoding='utf-8') as f:
-                content = f.read().strip()
-                if content:
-                    self.documents.append(content)
-                    print(f"Loaded: {file_path.name} ({len(content)} chars)")
-        
-        print(f"Loaded {len(self.documents)} documents")
-    
-    def create_embeddings(self):
-        """Create embeddings for all documents."""
-        if not self.documents:
-            self.load_documents()
-        
-        if not self.documents:
-            raise ValueError("No documents to embed. Add .txt files to the documents directory.")
-        
-        print("Creating embeddings...")
-        # Create embeddings using sentence-transformers
-        self.embeddings = self.embedding_model.encode(
-            self.documents,
-            convert_to_numpy=True,
-            show_progress_bar=True
-        )
-        print(f"Created {len(self.embeddings)} embeddings")
-    
-    def _cosine_similarity(self, vec1: np.ndarray, vec2: np.ndarray) -> float:
-        """Calculate cosine similarity between two vectors."""
-        return np.dot(vec1, vec2) / (np.linalg.norm(vec1) * np.linalg.norm(vec2))
-    
-    def _find_relevant_documents(self, query: str, top_k: int = 3) -> List[str]:
-        """Find the most relevant documents for a query."""
-        if len(self.embeddings) == 0:
-            raise ValueError("No embeddings found. Call create_embeddings() first.")
-        
-        # Embed the query
-        query_embedding = self.embedding_model.encode([query], convert_to_numpy=True)[0]
-        
-        # Calculate similarities
-        # self.embeddings is a 2D numpy array, iterate over rows
-        similarities = [
-            self._cosine_similarity(query_embedding, doc_emb)
-            for doc_emb in self.embeddings
-        ]
-        
-        # Get top k documents
-        top_indices = np.argsort(similarities)[-top_k:][::-1]
-        
-        return [self.documents[i] for i in top_indices]
     
     def _query_ollama(self, prompt: str) -> str:
         """Query Ollama with a prompt."""
@@ -347,36 +285,14 @@ JSON response:"""
                 "is_api_operation": True
             }
         
-        # This is a document query
-        if len(self.embeddings) == 0:
-            self.create_embeddings()
-        
-        # Find relevant documents
-        relevant_docs = self._find_relevant_documents(question, top_k)
-        context = "\n\n---\n\n".join(relevant_docs)
-        
-        # Build prompt for Ollama
-        prompt = f"""Answer the following question using only the information provided in the context below.
-
-If the context doesn't contain enough information to answer the question, say so clearly.
-
-Context:
-{context}
-
-Question: {question}
-
-Answer:"""
-        
-        # Query Ollama
-        print(f"Querying {self.model} for document-based answer...")
-        answer = self._query_ollama(prompt)
+        # Not an API operation - use Ollama to answer the question
+        print(f"Querying {self.model} for general question...")
+        answer = self._query_ollama(question)
         
         return {
             "answer": answer,
-            "context": context[:500] + "..." if len(context) > 500 else context,  # Truncated for display
             "is_api_operation": False
         }
-
 
 def main():
     """Example usage."""
@@ -388,11 +304,6 @@ def main():
     # Initialize agent (you can change 'llama2' to 'mistral', 'codellama', etc.)
     agent = SimpleRAG(model="llama2", api_base_url=api_url)
     
-    # Load and embed documents (only if documents exist)
-    try:
-        agent.create_embeddings()
-    except ValueError:
-        print("No documents found. Agent will work for API operations only.")
     
     print("\n" + "="*60)
     print("RAG Agent Ready!")
@@ -411,10 +322,10 @@ def main():
             break
         
         result = agent.query(question)
-        print(f"\n{result['answer']}")
-        
-        if not result.get('is_api_operation') and result.get('context'):
-            print(f"\n(Used context: {result['context'][:200]}...)")
+        if result and result.get('answer'):
+            print(f"\n{result['answer']}")
+        else:
+            print("\n❌ Error: No response from agent")
 
 
 if __name__ == "__main__":
