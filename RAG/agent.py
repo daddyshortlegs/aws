@@ -16,32 +16,36 @@ from sentence_transformers import SentenceTransformer
 import numpy as np
 import httpx
 
-client = Client(
-    host="http://localhost:11434"
-)
 
 class SimpleRAG:
-    def __init__(self, model: str = "llama2", documents_dir: str = "documents", api_base_url: str = "http://127.0.0.1:8081"):
+    def __init__(self, model: str = "llama2", api_base_url: str = "http://127.0.0.1:8081"):
         """
-        Initialize the RAG agent.
-        
         Args:
             model: Ollama model name (e.g., 'llama2', 'mistral', 'codellama')
-            documents_dir: Directory containing text documents
             api_base_url: Base URL for the backend API
         """
         self.model = model
-        self.documents_dir = Path(documents_dir)
-        self.documents: List[str] = []
-        self.embeddings: List[np.ndarray] = []
+
+        self.client = Client(
+            host="http://localhost:11434"
+        )
+
         self.api_base_url = api_base_url.rstrip('/')
+  
+    def extractJsonFromResponse(self, response: str) -> Optional[Dict[str, any]]:
+        try:
+            start_idx = response.find('{')
+            end_idx = response.rfind('}') + 1
+            if start_idx >= 0 and end_idx > start_idx:
+                json_str = response[start_idx:end_idx]
+                result = json.loads(json_str)
+                if result.get("operation"):
+                    return result
+        except (json.JSONDecodeError, ValueError) as e:
+            print(f"Warning: Could not parse API operation detection: {e}")
         
-        # Use a local embedding model (no API needed)
-        print("Loading embedding model...")
-        self.embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
-        print("Embedding model loaded!")
-        
- 
+        return None
+
     def _detect_api_operation(self, question: str) -> Optional[Dict[str, any]]:
 
         messages = [
@@ -77,30 +81,18 @@ class SimpleRAG:
         ]
 
 
-        message: ChatResponse = client.chat('llama2', messages=messages)
+        message: ChatResponse = self.client.chat(self.model, messages=messages)
         
         response = message.message.content
         print("response: ", response)
 
-
-
-        # Try to extract JSON from response
-        try:
-            # Look for JSON in the response
-            start_idx = response.find('{')
-            end_idx = response.rfind('}') + 1
-            if start_idx >= 0 and end_idx > start_idx:
-                json_str = response[start_idx:end_idx]
-                result = json.loads(json_str)
-                if result.get("operation"):
-                    return result
-        except (json.JSONDecodeError, ValueError) as e:
-            print(f"Warning: Could not parse API operation detection: {e}")
+        result = self.extractJsonFromResponse(response)
+        if result:
+            return result
         
         return None
     
     def _call_api(self, operation: str, params: Dict) -> Dict[str, any]:
-        """Call the backend API with the given operation and parameters."""
         try:
             with httpx.Client(timeout=30.0) as client:
                 if operation == "launch-vm":
@@ -137,6 +129,7 @@ class SimpleRAG:
                 elif operation == "delete-vm":
                     # If name is provided, first list VMs to find the ID
                     vm_id = params.get("id")
+                    print("vm_id: ", vm_id)
                     if not vm_id and params.get("name"):
                         list_response = client.get(f"{self.api_base_url}/list-vms")
                         list_response.raise_for_status()
@@ -166,7 +159,9 @@ class SimpleRAG:
                             "error": "VM ID or name is required"
                         }
                     
-                    response = client.delete(
+                    print("deleting vm with id: ", vm_id)
+                    response = client.request(
+                        "DELETE",
                         f"{self.api_base_url}/delete-vm",
                         json={"id": vm_id}
                     )
@@ -202,13 +197,12 @@ class SimpleRAG:
                 "error": f"Unexpected error: {str(e)}"
             }
     
-    def query(self, question: str, top_k: int = 3) -> Dict[str, any]:
+    def query(self, question: str) -> Dict[str, any]:
         """
         Query the RAG agent. Can handle both API operations and document queries.
         
         Args:
             question: The question to ask or API operation to perform
-            top_k: Number of relevant documents to retrieve (for document queries)
             
         Returns:
             Dictionary with 'answer', 'context', 'api_result' keys
@@ -263,27 +257,21 @@ class SimpleRAG:
                 'content': question
             }
         ]
-        response: ChatResponse = client.chat('llama2', messages=messages)
-        answer = response.message.content
+        response: ChatResponse = self.client.chat(self.model, messages=messages)
         
         return {
-            "answer": answer,
+            "answer": response.message.content,
             "is_api_operation": False
         }
 
 def main():
-    """Example usage."""
     import sys
     
-    # Allow API URL to be set via environment variable
     api_url = os.getenv("BACKEND_API_URL", "http://127.0.0.1:8081")
-    
-    # Initialize agent (you can change 'llama2' to 'mistral', 'codellama', etc.)
     agent = SimpleRAG(model="llama2", api_base_url=api_url)
     
-    
     print("\n" + "="*60)
-    print("RAG Agent Ready!")
+    print("AWS Agent Ready!")
     print("="*60)
     print("You can:")
     print("  • Ask questions about documents")
@@ -292,7 +280,6 @@ def main():
     print("  • Delete VMs: 'delete VM with id abc123' or 'delete VM called my-vm'")
     print("="*60)
     
-    # Query the agent
     while True:
         question = input("\nAsk a question or perform an operation (or 'quit' to exit): ")
         if question.lower() in ['quit', 'exit', 'q']:
