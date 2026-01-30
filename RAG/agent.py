@@ -68,6 +68,8 @@ class SimpleRAG:
         - instance_type: "t2.micro"
         - region: "us-east-1"
 
+        If a name is used rather than an ID in the operations, first list all VMs to find the ID.
+
         Examples:
         - "create a VM called test-vm" -> {{"operation": "launch-vm", "params": {{"name": "test-vm", "instance_type": "t2.micro", "region": "us-east-1"}}}}
         - "list all VMs" -> {{"operation": "list-vms", "params": {{}}}}
@@ -91,93 +93,21 @@ class SimpleRAG:
             return result
         
         return None
-    
+
     def _call_api(self, operation: str, params: Dict) -> Dict[str, any]:
         try:
             with httpx.Client(timeout=30.0) as client:
                 if operation == "launch-vm":
-                    payload = {
-                        "name": params.get("name", "unnamed-vm"),
-                        "instance_type": params.get("instance_type", "t2.micro"),
-                        "region": params.get("region", "us-east-1")
-                    }
-                    response = client.post(
-                        f"{self.api_base_url}/launch-vm",
-                        json=payload
-                    )
-                    response.raise_for_status()
-                    return {
-                        "success": True,
-                        "operation": "launch-vm",
-                        "data": response.json()
-                    }
-                
+                    return self._launch_vm(params, client)
                 elif operation == "list-vms":
-                    response = client.get(f"{self.api_base_url}/list-vms")
-                    response.raise_for_status()
-                    data = response.json()
-                    # Backend returns a list directly, or a dict with "vms" key
-                    # Normalize to always have a "vms" key
-                    if isinstance(data, list):
-                        data = {"vms": data}
-                    return {
-                        "success": True,
-                        "operation": "list-vms",
-                        "data": data
-                    }
-                
+                    return self._list_vms(client)
                 elif operation == "delete-vm":
-                    # If name is provided, first list VMs to find the ID
-                    vm_id = params.get("id")
-                    print("vm_id: ", vm_id)
-                    if not vm_id and params.get("name"):
-                        list_response = client.get(f"{self.api_base_url}/list-vms")
-                        list_response.raise_for_status()
-                        vms_data = list_response.json()
-                        # Backend returns a list directly, or a dict with "vms" key
-                        if isinstance(vms_data, list):
-                            vms = vms_data
-                        else:
-                            vms = vms_data.get("vms", [])
-                        # Find VM by name
-                        for vm in vms:
-                            if vm.get("name") == params["name"]:
-                                vm_id = vm.get("id")
-                                break
-                        
-                        if not vm_id:
-                            return {
-                                "success": False,
-                                "operation": "delete-vm",
-                                "error": f"VM with name '{params['name']}' not found"
-                            }
-                    
-                    if not vm_id:
-                        return {
-                            "success": False,
-                            "operation": "delete-vm",
-                            "error": "VM ID or name is required"
-                        }
-                    
-                    print("deleting vm with id: ", vm_id)
-                    response = client.request(
-                        "DELETE",
-                        f"{self.api_base_url}/delete-vm",
-                        json={"id": vm_id}
-                    )
-                    response.raise_for_status()
-                    return {
-                        "success": True,
-                        "operation": "delete-vm",
-                        "data": {"message": response.text}
-                    }
-                
+                    return self._delete_vm(params, client)
                 else:
                     return {
                         "success": False,
                         "error": f"Unknown operation: {operation}"
                     }
-        
         except httpx.HTTPStatusError as e:
             return {
                 "success": False,
@@ -197,6 +127,84 @@ class SimpleRAG:
                 "error": f"Unexpected error: {str(e)}"
             }
     
+    
+    def _launch_vm(self, params: Dict, client: httpx.Client) -> Dict[str, any]:
+        payload = {
+            "name": params.get("name", "unnamed-vm"),
+            "instance_type": params.get("instance_type", "t2.micro"),
+            "region": params.get("region", "us-east-1")
+        }
+        response = client.post(
+            f"{self.api_base_url}/launch-vm",
+            json=payload
+        )
+        response.raise_for_status()
+        return {
+            "success": True,
+            "operation": "launch-vm",
+            "data": response.json()
+        }
+
+    def _list_vms(self, client: httpx.Client) -> Dict[str, any]:
+        response = client.get(f"{self.api_base_url}/list-vms")
+        response.raise_for_status()
+        data = response.json()
+        # Backend returns a list directly, or a dict with "vms" key
+        # Normalize to always have a "vms" key
+        if isinstance(data, list):
+            data = {"vms": data}
+        return {
+            "success": True,
+            "operation": "list-vms",
+            "data": data
+        }
+
+    def _delete_vm(self, params: Dict, client: httpx.Client) -> Dict[str, any]:
+        # If name is provided, first list VMs to find the ID
+        vm_id = params.get("id")
+        print("vm_id: ", vm_id)
+        if not vm_id and params.get("name"):
+            list_response = client.get(f"{self.api_base_url}/list-vms")
+            list_response.raise_for_status()
+            vms_data = list_response.json()
+            # Backend returns a list directly, or a dict with "vms" key
+            if isinstance(vms_data, list):
+                vms = vms_data
+            else:
+                vms = vms_data.get("vms", [])
+            # Find VM by name
+            for vm in vms:
+                if vm.get("name") == params["name"]:
+                    vm_id = vm.get("id")
+                    break
+
+            if not vm_id:
+                return {
+                    "success": False,
+                    "operation": "delete-vm",
+                    "error": f"VM with name '{params['name']}' not found"
+                }
+
+        if not vm_id:
+            return {
+                "success": False,
+                "operation": "delete-vm",
+                "error": "VM ID or name is required"
+            }
+
+        print("deleting vm with id: ", vm_id)
+        response = client.request(
+            "DELETE",
+            f"{self.api_base_url}/delete-vm",
+            json={"id": vm_id}
+        )
+        response.raise_for_status()
+        return {
+            "success": True,
+            "operation": "delete-vm",
+            "data": {"message": response.text}
+        }
+
     def query(self, question: str) -> Dict[str, any]:
         """
         Query the RAG agent. Can handle both API operations and document queries.
