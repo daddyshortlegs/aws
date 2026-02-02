@@ -2,7 +2,7 @@
 Simple RAG Agent using Ollama
 The simplest possible RAG implementation using local models via Ollama.
 Supports both document queries and API operations.
-Can be run as a CLI tool or as an HTTP server.
+Runs as an HTTP server with a /query endpoint.
 """
 import os
 import subprocess
@@ -328,52 +328,11 @@ def query_endpoint(request: QueryRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# CLI mode
-def cli_mode():
-    """Run the agent in interactive CLI mode"""
-    import sys
-    
-    api_url = os.getenv("BACKEND_API_URL", "http://127.0.0.1:8081")
-    cli_agent = SimpleRAG(model="llama2", api_base_url=api_url)
-    
-    print("\n" + "="*60)
-    print("AWS Agent Ready!")
-    print("="*60)
-    print("You can:")
-    print("  • Ask questions about documents")
-    print("  • Create VMs: 'create a VM called my-vm'")
-    print("  • List VMs: 'list all VMs'")
-    print("  • Delete VMs: 'delete VM with id abc123' or 'delete VM called my-vm'")
-    print("="*60)
-    
-    while True:
-        question = input("\nAsk a question or perform an operation (or 'quit' to exit): ")
-        if question.lower() in ['quit', 'exit', 'q']:
-            break
-        
-        result = cli_agent.query(question)
-        if result and result.get('answer'):
-            print(f"\n{result['answer']}")
-        else:
-            print("\n❌ Error: No response from agent")
-
-
-def server_mode():
-    """Run the agent as an HTTP server"""
+if __name__ == "__main__":
     port = int(os.getenv("RAG_PORT", "8082"))
     host = os.getenv("RAG_HOST", "0.0.0.0")
-    
+
     logger.info(f"Starting RAG Agent server on {host}:{port}")
     logger.info(f"API documentation available at http://{host}:{port}/docs")
-    
+
     uvicorn.run(app, host=host, port=port)
-
-
-if __name__ == "__main__":
-    import sys
-    
-    # Check if server mode is requested
-    if len(sys.argv) > 1 and sys.argv[1] == "server":
-        server_mode()
-    else:
-        cli_mode()

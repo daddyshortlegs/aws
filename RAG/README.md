@@ -2,14 +2,6 @@
 
 A minimal Retrieval-Augmented Generation agent using local models via Ollama. No API keys required!
 
-Supports both:
-- **Document queries**: Ask questions about documents in the knowledge base
-- **API operations**: Perform VM management operations via natural language
-
-Can run as:
-- **CLI tool**: Interactive command-line interface
-- **HTTP server**: FastAPI REST API with Swagger documentation
-
 ## Prerequisites
 
 1. **Install Ollama**: https://ollama.ai
@@ -42,37 +34,21 @@ Can run as:
 
 ## Usage
 
-### CLI Mode (Interactive)
-
-Run the agent in interactive mode:
+Run the RAG agent as an HTTP server:
 
 ```bash
 python agent.py
 ```
 
-Then you can:
-- Ask questions about documents: "What is QEMU?"
-- Create VMs: "create a VM called my-vm"
-- List VMs: "list all VMs"
-- Delete VMs: "delete VM with id abc123" or "delete VM called my-vm"
-
-### Server Mode (HTTP API)
-
-Run the agent as an HTTP server:
-
-```bash
-python agent.py server
-```
-
-Or with custom host/port:
+With custom host/port:
 
 ```bash
 export RAG_PORT=8082
 export RAG_HOST=0.0.0.0
-python agent.py server
+python agent.py
 ```
 
-The server will start on `http://0.0.0.0:8082` (default).
+The server starts on `http://0.0.0.0:8082` (default).
 
 **API Documentation:**
 - Swagger UI: `http://localhost:8082/docs`
@@ -101,62 +77,7 @@ curl -X POST http://localhost:8082/query \
   -d '{"question": "delete VM with id abc123"}'
 ```
 
-### Python API
-
-```python
-from RAG.agent import SimpleRAG
-
-# Initialize agent (defaults to 'llama2' model)
-agent = SimpleRAG(model="llama2", api_base_url="http://127.0.0.1:8081")
-
-# Query documents or perform API operations
-result = agent.query("create a VM called test-vm")
-print(result["answer"])
-```
-
-## API Operations
-
-The agent can perform the following VM management operations:
-
-### Launch VM
-- **Examples**:
-  - "create a VM called test-vm"
-  - "launch a new VM named production-server"
-  - "start a VM called dev-env in us-west-2"
-- **Parameters** (extracted automatically):
-  - `name` (required): VM name
-  - `instance_type` (optional, default: "t2.micro")
-  - `region` (optional, default: "us-east-1")
-
-### List VMs
-- **Examples**:
-  - "list all VMs"
-  - "show me all virtual machines"
-  - "what VMs are running?"
-
-### Delete VM
-- **Examples**:
-  - "delete VM with id abc-123-def"
-  - "remove the VM called test-vm"
-  - "terminate VM test-vm"
-
-## Available Models
-
-You can use any Ollama model. Popular options:
-- `llama2` - General purpose (default)
-- `mistral` - Fast and efficient
-- `codellama` - Code-focused
-- `llama2:13b` - Larger, more capable version
-
-Change the model in the `SimpleRAG()` constructor.
-
 ## How It Works
-
-### Document Queries
-1. **Document Loading**: Loads all `.txt` files from the `documents/` directory
-2. **Embeddings**: Uses `sentence-transformers` to create embeddings (runs locally)
-3. **Retrieval**: Finds the most relevant documents using cosine similarity
-4. **Generation**: Uses Ollama to generate answers based on retrieved context
 
 ### API Operations
 1. **Intent Detection**: Uses LLM to detect if the query is an API operation
@@ -164,24 +85,6 @@ Change the model in the `SimpleRAG()` constructor.
 3. **API Call**: Makes HTTP request to the backend API
 4. **Response Formatting**: Formats the API response for the user
 
-## Configuration
-
-Set environment variables to customize behavior:
-
-```bash
-# Backend API URL (default: http://127.0.0.1:8081)
-export BACKEND_API_URL="http://localhost:8081"
-
-# Server mode configuration
-export RAG_PORT=8082        # Default: 8082
-export RAG_HOST=0.0.0.0     # Default: 0.0.0.0
-
-# Run in CLI mode
-python agent.py
-
-# Run in server mode
-python agent.py server
-```
 
 ## Deployment
 
@@ -200,30 +103,3 @@ This will:
 5. Create and start a systemd service running the HTTP server on port 8082
 
 The service will be available at `http://<server-ip>:8082`
-
-## Examples
-
-### Document Query
-```bash
-# Add a document
-echo "Python is a programming language. It is known for its simplicity." > documents/python.txt
-
-# Run the agent
-python -m RAG.agent
-
-# Ask: "What is Python?"
-# Answer: Based on the context, Python is a programming language known for its simplicity.
-```
-
-### API Operation
-```bash
-# Run the agent (make sure backend is running)
-python -m RAG.agent
-
-# Ask: "create a VM called test-vm"
-# Answer: ✅ VM launched successfully!
-#         Instance ID: abc-123-def
-#         Name: test-vm
-#         SSH Port: 49152
-#         Message: VM launch request received for test-vm in us-east-1
-```
