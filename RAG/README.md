@@ -6,6 +6,10 @@ Supports both:
 - **Document queries**: Ask questions about documents in the knowledge base
 - **API operations**: Perform VM management operations via natural language
 
+Can run as:
+- **CLI tool**: Interactive command-line interface
+- **HTTP server**: FastAPI REST API with Swagger documentation
+
 ## Prerequisites
 
 1. **Install Ollama**: https://ollama.ai
@@ -36,14 +40,66 @@ Supports both:
    pip install -r requirements.txt
    ```
 
-2. (Optional) Add documents to the `documents/` directory as `.txt` files for document queries
-
-3. Run the agent:
-   ```bash
-   python -m RAG.agent
-   ```
-
 ## Usage
+
+### CLI Mode (Interactive)
+
+Run the agent in interactive mode:
+
+```bash
+python agent.py
+```
+
+Then you can:
+- Ask questions about documents: "What is QEMU?"
+- Create VMs: "create a VM called my-vm"
+- List VMs: "list all VMs"
+- Delete VMs: "delete VM with id abc123" or "delete VM called my-vm"
+
+### Server Mode (HTTP API)
+
+Run the agent as an HTTP server:
+
+```bash
+python agent.py server
+```
+
+Or with custom host/port:
+
+```bash
+export RAG_PORT=8082
+export RAG_HOST=0.0.0.0
+python agent.py server
+```
+
+The server will start on `http://0.0.0.0:8082` (default).
+
+**API Documentation:**
+- Swagger UI: `http://localhost:8082/docs`
+- ReDoc: `http://localhost:8082/redoc`
+- OpenAPI schema: `http://localhost:8082/openapi.json`
+
+**Example API Calls:**
+
+```bash
+# Health check
+curl http://localhost:8082/health
+
+# Query endpoint
+curl -X POST http://localhost:8082/query \
+  -H "Content-Type: application/json" \
+  -d '{"question": "list all VMs"}'
+
+# Create a VM
+curl -X POST http://localhost:8082/query \
+  -H "Content-Type: application/json" \
+  -d '{"question": "create a VM called test-vm"}'
+
+# Delete a VM
+curl -X POST http://localhost:8082/query \
+  -H "Content-Type: application/json" \
+  -d '{"question": "delete VM with id abc123"}'
+```
 
 ### Python API
 
@@ -53,31 +109,10 @@ from RAG.agent import SimpleRAG
 # Initialize agent (defaults to 'llama2' model)
 agent = SimpleRAG(model="llama2", api_base_url="http://127.0.0.1:8081")
 
-# Load and embed documents (optional)
-agent.create_embeddings()
-
-# Query documents
-result = agent.query("What is the main topic?")
-print(result["answer"])
-
-# Or perform API operations
+# Query documents or perform API operations
 result = agent.query("create a VM called test-vm")
 print(result["answer"])
 ```
-
-### Interactive Mode
-
-Run the agent and interact with it:
-
-```bash
-python -m RAG.agent
-```
-
-Then you can:
-- Ask questions about documents: "What is QEMU?"
-- Create VMs: "create a VM called my-vm"
-- List VMs: "list all VMs"
-- Delete VMs: "delete VM with id abc123" or "delete VM called my-vm"
 
 ## API Operations
 
@@ -137,9 +172,34 @@ Set environment variables to customize behavior:
 # Backend API URL (default: http://127.0.0.1:8081)
 export BACKEND_API_URL="http://localhost:8081"
 
-# Run the agent
-python -m RAG.agent
+# Server mode configuration
+export RAG_PORT=8082        # Default: 8082
+export RAG_HOST=0.0.0.0     # Default: 0.0.0.0
+
+# Run in CLI mode
+python agent.py
+
+# Run in server mode
+python agent.py server
 ```
+
+## Deployment
+
+The RAG agent can be deployed as a systemd service using Ansible:
+
+```bash
+cd RAG
+ansible-playbook -i ../inventory/hosts.yaml deploy-rag.yaml
+```
+
+This will:
+1. Install Python, Ollama, and dependencies
+2. Copy RAG files to the server
+3. Create a virtual environment
+4. Pull the llama2 model
+5. Create and start a systemd service running the HTTP server on port 8082
+
+The service will be available at `http://<server-ip>:8082`
 
 ## Examples
 

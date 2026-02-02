@@ -2,10 +2,12 @@
 Simple RAG Agent using Ollama
 The simplest possible RAG implementation using local models via Ollama.
 Supports both document queries and API operations.
+Can be run as a CLI tool or as an HTTP server.
 """
 import os
 import subprocess
 import json
+import logging
 
 from ollama import Client
 from ollama import ChatResponse
@@ -15,6 +17,14 @@ from typing import List, Dict, Optional
 from sentence_transformers import SentenceTransformer
 import numpy as np
 import httpx
+
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+import uvicorn
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 class SimpleRAG:
@@ -42,7 +52,7 @@ class SimpleRAG:
                 if result.get("operation"):
                     return result
         except (json.JSONDecodeError, ValueError) as e:
-            print(f"Warning: Could not parse API operation detection: {e}")
+            logger.warning(f"Could not parse API operation detection: {e}")
         
         return None
 
@@ -86,7 +96,7 @@ class SimpleRAG:
         message: ChatResponse = self.client.chat(self.model, messages=messages)
         
         response = message.message.content
-        print("response: ", response)
+        logger.info(f"LLM response: {response}")
 
         result = self.extractJsonFromResponse(response)
         if result:
@@ -162,7 +172,7 @@ class SimpleRAG:
     def _delete_vm(self, params: Dict, client: httpx.Client) -> Dict[str, any]:
         # If name is provided, first list VMs to find the ID
         vm_id = params.get("id")
-        print("vm_id: ", vm_id)
+        logger.info(f"vm_id: {vm_id}")
         if not vm_id and params.get("name"):
             list_response = client.get(f"{self.api_base_url}/list-vms")
             list_response.raise_for_status()
@@ -192,7 +202,7 @@ class SimpleRAG:
                 "error": "VM ID or name is required"
             }
 
-        print("deleting vm with id: ", vm_id)
+        logger.info(f"deleting vm with id: {vm_id}")
         response = client.request(
             "DELETE",
             f"{self.api_base_url}/delete-vm",
@@ -216,7 +226,7 @@ class SimpleRAG:
             Dictionary with 'answer', 'context', 'api_result' keys
         """
         # First, check if this is an API operation
-        print("Detecting if this is an API operation...")
+        logger.info("Detecting if this is an API operation...")
         api_op = self._detect_api_operation(question)
         
         if api_op and api_op.get("operation"):
@@ -224,7 +234,7 @@ class SimpleRAG:
             operation = api_op["operation"]
             params = api_op.get("params", {})
             
-            print(f"Detected API operation: {operation} with params: {params}")
+            logger.info(f"Detected API operation: {operation} with params: {params}")
             api_result = self._call_api(operation, params)
             
             # Format the result for the user
@@ -257,7 +267,7 @@ class SimpleRAG:
             }
         
         # Not an API operation - use Ollama to answer the question
-        print(f"Querying {self.model} for general question...")
+        logger.info(f"Querying {self.model} for general question...")
 
         messages = [
             {
@@ -272,11 +282,59 @@ class SimpleRAG:
             "is_api_operation": False
         }
 
-def main():
+
+# FastAPI setup
+app = FastAPI(
+    title="RAG Agent API",
+    description="Natural language interface for VM management using Ollama",
+    version="1.0.0"
+)
+
+# Request/Response models
+class QueryRequest(BaseModel):
+    question: str
+
+class QueryResponse(BaseModel):
+    answer: str
+    is_api_operation: bool
+    api_result: Optional[Dict] = None
+
+# Initialize RAG agent
+api_url = os.getenv("BACKEND_API_URL", "http://127.0.0.1:8081")
+agent = SimpleRAG(model="llama2", api_base_url=api_url)
+
+# API endpoints
+@app.get("/health")
+def health():
+    """Health check endpoint"""
+    return {"status": "healthy", "model": agent.model}
+
+@app.post("/query", response_model=QueryResponse)
+def query_endpoint(request: QueryRequest):
+    """
+    Main query endpoint. Accepts natural language questions and VM operations.
+    
+    Examples:
+    - "create a VM called my-vm"
+    - "list all VMs"
+    - "delete VM with id abc123"
+    - "what is a VM?"
+    """
+    try:
+        result = agent.query(request.question)
+        return result
+    except Exception as e:
+        logger.error(f"Error processing query: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# CLI mode
+def cli_mode():
+    """Run the agent in interactive CLI mode"""
     import sys
     
     api_url = os.getenv("BACKEND_API_URL", "http://127.0.0.1:8081")
-    agent = SimpleRAG(model="llama2", api_base_url=api_url)
+    cli_agent = SimpleRAG(model="llama2", api_base_url=api_url)
     
     print("\n" + "="*60)
     print("AWS Agent Ready!")
@@ -293,12 +351,29 @@ def main():
         if question.lower() in ['quit', 'exit', 'q']:
             break
         
-        result = agent.query(question)
+        result = cli_agent.query(question)
         if result and result.get('answer'):
             print(f"\n{result['answer']}")
         else:
             print("\n❌ Error: No response from agent")
 
 
+def server_mode():
+    """Run the agent as an HTTP server"""
+    port = int(os.getenv("RAG_PORT", "8082"))
+    host = os.getenv("RAG_HOST", "0.0.0.0")
+    
+    logger.info(f"Starting RAG Agent server on {host}:{port}")
+    logger.info(f"API documentation available at http://{host}:{port}/docs")
+    
+    uvicorn.run(app, host=host, port=port)
+
+
 if __name__ == "__main__":
-    main()
+    import sys
+    
+    # Check if server mode is requested
+    if len(sys.argv) > 1 and sys.argv[1] == "server":
+        server_mode()
+    else:
+        cli_mode()
