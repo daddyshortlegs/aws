@@ -28,7 +28,7 @@ func New() provider.Provider {
 }
 
 func (p *vmLauncherProvider) Metadata(_ context.Context, _ provider.MetadataRequest, resp *provider.MetadataResponse) {
-	resp.TypeName = "vmlauncher"
+	resp.TypeName = "aws2"
 }
 
 func (p *vmLauncherProvider) Schema(_ context.Context, _ provider.SchemaRequest, resp *provider.SchemaResponse) {

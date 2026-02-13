@@ -10,7 +10,7 @@ import (
 
 func main() {
 	err := providerserver.Serve(context.Background(), provider.New, providerserver.ServeOpts{
-		Address: "localhost/myorg/vm-launcher",
+		Address: "localhost/myorg/aws2",
 	})
 	if err != nil {
 		log.Fatal(err)

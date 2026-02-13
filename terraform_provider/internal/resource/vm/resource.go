@@ -36,8 +36,7 @@ func NewVMResource() resource.Resource {
 }
 
 func (r *vmResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
-	// Provider type is "vmlauncher", so resource type becomes "vmlauncher_vm".
-	// (Terraform splits on first underscore: "vm_launcher_vm" would be provider "vm", resource "launcher_vm".)
+	// Provider type is "aws2", so resource type becomes "aws2_vm".
 	resp.TypeName = req.ProviderTypeName + "_vm"
 }
 

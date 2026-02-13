@@ -10,6 +10,7 @@ override.tf.json
 *_override.tf.json
 
 # Go
+terraform-provider-aws2
 terraform-provider-vm-launcher
 terraform-provider-vm_launcher
 *.exe

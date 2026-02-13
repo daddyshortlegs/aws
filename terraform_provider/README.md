@@ -1,4 +1,4 @@
-# Terraform Provider for VM Launcher (local use only)
+# Terraform Provider aws2 (local use only)
 
 This provider manages VMs via your [VM launcher proxy](../proxy) API. It is intended for **local use only** (no registry publish).
 
@@ -13,10 +13,16 @@ This provider manages VMs via your [VM launcher proxy](../proxy) API. It is inte
 From this directory (`terraform_provider/`):
 
 ```bash
-go build -o terraform-provider-vm-launcher .
+make build
 ```
 
-The binary must be named `terraform-provider-vm-launcher` (hyphen, to match the source type `vm-launcher`) and live in the directory you point Terraform at (see below).
+Or with Go directly:
+
+```bash
+go build -o terraform-provider-aws2 .
+```
+
+The binary is named `terraform-provider-aws2` to match the provider source type `aws2`.
 
 ## Use with Terraform (dev overrides)
 
@@ -27,7 +33,7 @@ The binary must be named `terraform-provider-vm-launcher` (hyphen, to match the 
    ```hcl
    provider_installation {
      dev_overrides {
-       "localhost/myorg/vm-launcher" = "/Users/you/home-git/aws/terraform_provider"
+       "localhost/myorg/aws2" = "/Users/you/home-git/aws/terraform_provider"
      }
      direct {}
    }
@@ -58,7 +64,7 @@ The binary must be named `terraform-provider-vm-launcher` (hyphen, to match the 
 |------------------|----------|-------------------------|--------------------------------------|
 | `proxy_base_url` | No       | `http://127.0.0.1:8080` | Base URL of the VM launcher proxy.   |
 
-## Resource: `vmlauncher_vm`
+## Resource: `aws2_vm`
 
 | Attribute        | Required | Computed | Description                          |
 |------------------|----------|----------|--------------------------------------|
@@ -74,18 +80,18 @@ The binary must be named `terraform-provider-vm-launcher` (hyphen, to match the 
 ```hcl
 terraform {
   required_providers {
-    vmlauncher = {
-      source  = "localhost/myorg/vm-launcher"
+    aws2 = {
+      source  = "localhost/myorg/aws2"
       version = "0.1.0"
     }
   }
 }
 
-provider "vmlauncher" {
+provider "aws2" {
   proxy_base_url = "http://127.0.0.1:8080"
 }
 
-resource "vmlauncher_vm" "my_vm" {
+resource "aws2_vm" "my_vm" {
   name = "my-vm"
 }
 ```
