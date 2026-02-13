@@ -1,0 +1,13 @@
+# Copy this file to ~/.terraformrc (or %APPDATA%\terraform.rc on Windows)
+# so Terraform uses the local VM launcher provider binary.
+#
+# Replace /path/to/terraform_provider with the absolute path to the
+# terraform_provider directory (the one containing terraform-provider-vm-launcher).
+# The key MUST be in quotes because it contains slashes.
+
+provider_installation {
+  dev_overrides {
+    "localhost/myorg/vm-launcher" = "/path/to/terraform_provider"
+  }
+  direct {}
+}

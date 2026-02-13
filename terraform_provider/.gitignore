@@ -1,0 +1,16 @@
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+.terraform.lock.hcl
+crash.*
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Go
+terraform-provider-vm-launcher
+terraform-provider-vm_launcher
+*.exe
+*.test
