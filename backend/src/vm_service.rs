@@ -44,6 +44,7 @@ pub async fn launch_vm(
 
     // Copy the QCOW2 file
     if let Err(e) = fs::copy(&source_qcow2, &target_qcow2).await {
+        error!("Failed to copy QCOW2 file from {source_qcow2:?} to {target_qcow2:?}: {e}");
         let response = LaunchVmResponse {
             success: false,
             message: format!("Failed to copy QCOW2 file: {e}"),
@@ -82,11 +83,12 @@ pub async fn launch_vm(
                 pid: child.id().unwrap(),
             };
 
-            let _ = store_vm_info(&vm_info);
+            let _ = store_vm_info(&config.storage.metadata_dir, &vm_info);
 
             (StatusCode::OK, Json(response))
         }
         Err(e) => {
+            error!("Failed to launch VM {}: {e}", payload.name);
             let response = LaunchVmResponse {
                 success: false,
                 message: format!("Failed to launch VM: {e}"),
@@ -100,21 +102,25 @@ pub async fn launch_vm(
 }
 
 pub async fn list_vms_handler() -> impl IntoResponse {
-    match list_vms() {
+    match list_vms(&Config::get_vms_dir()) {
         Ok(vms) => (StatusCode::OK, axum::Json(vms)).into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+        Err(e) => {
+            error!("Failed to list VMs: {e}");
+            (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response()
+        }
     }
 }
 
 pub async fn start_all_vms() {
-    let vms = list_vms().unwrap();
+    let vms_dir = Config::get_vms_dir();
+    let vms = list_vms(&vms_dir).unwrap();
 
     for vm in vms {
-        let vm_info = get_vm_by_id(&vm.id).unwrap().unwrap();
+        let vm_info = get_vm_by_id(&vms_dir, &vm.id).unwrap().unwrap();
         let uuid = vm_info.id;
         let vm_name = vm_info.name;
         let ssh_port = vm_info.ssh_port;
-        let qcow2_file = Config::get_vms_dir().join(format!("{vm_name}.qcow2"));
+        let qcow2_file = vms_dir.join(format!("{vm_name}.qcow2"));
         let output = vm_start(qcow2_file.to_str().unwrap(), ssh_port);
         match output {
             Ok(child) => {
@@ -125,7 +131,7 @@ pub async fn start_all_vms() {
                     pid: child.id().unwrap(),
                 };
 
-                let _ = store_vm_info(&vm_info);
+                let _ = store_vm_info(&vms_dir, &vm_info);
 
                 info!("VM {} started with PID: {}", vm.name, child.id().unwrap());
             }
@@ -144,7 +150,9 @@ pub struct DeleteVmRequest {
 pub async fn delete_vm_handler(Json(payload): Json<DeleteVmRequest>) -> impl IntoResponse {
     info!("Deleting VM: {payload:?}");
 
-    match get_vm_by_id(&payload.id) {
+    let config = Config::load().expect("Failed to load configuration");
+
+    match get_vm_by_id(&config.storage.metadata_dir, &payload.id) {
         Ok(Some(vm_info)) => {
             // Try to terminate the process
             match kill(Pid::from_raw(vm_info.pid as i32), Signal::SIGTERM) {
@@ -155,22 +163,6 @@ pub async fn delete_vm_handler(Json(payload): Json<DeleteVmRequest>) -> impl Int
                     // Check if process is still running, if so, force kill it
                     if kill(Pid::from_raw(vm_info.pid as i32), Signal::SIGKILL).is_ok() {
                         warn!("Process {} was still running, force killed", vm_info.pid);
-                    }
-
-                    // Delete the JSON file using the same path as other operations
-                    let config = Config::load().expect("Failed to load configuration");
-                    let file_path = config
-                        .storage
-                        .metadata_dir
-                        .join(format!("{}.json", vm_info.id));
-
-                    if let Err(e) = fs::remove_file(&file_path).await {
-                        error!("Error deleting VM info file: {file_path:?} - {e}");
-                        return (
-                            StatusCode::INTERNAL_SERVER_ERROR,
-                            "Failed to delete VM info file",
-                        )
-                            .into_response();
                     }
 
                     // Delete the corresponding QCOW2 file
@@ -187,7 +179,7 @@ pub async fn delete_vm_handler(Json(payload): Json<DeleteVmRequest>) -> impl Int
                         info!("Successfully deleted QCOW2 file: {qcow2_file_path:?}");
                     }
 
-                    let _ = delete_vm_by_id(&vm_info.id);
+                    let _ = delete_vm_by_id(&config.storage.metadata_dir, &vm_info.id);
 
                     (StatusCode::OK, "VM successfully terminated and removed").into_response()
                 }

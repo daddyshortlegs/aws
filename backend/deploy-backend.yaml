@@ -19,9 +19,12 @@
        - target/release/vm-launcher
        - alpine.qcow2
 
-   - name: Copy config file
+   - name: Create config file
      ansible.builtin.copy:
-       src: config.ci.toml
+       content: |
+         [storage]
+         qcow2_dir = "{{ aws_base_path }}/vm-data"
+         metadata_dir = "{{ aws_base_path }}/vm-data"
        dest: "{{ aws_base_path }}/backend/config.toml"
 
    - name: Create systemd service file
