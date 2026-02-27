@@ -1,0 +1,109 @@
+- name: Setup RAG Agent
+  hosts: workers
+  tasks:
+   - name: Install Python3 and pip
+     ansible.builtin.apt:
+       name:
+         - python3
+         - python3-pip
+         - python3-venv
+       state: present
+       update_cache: yes
+     become: yes
+
+   - name: Download Ollama install script
+     ansible.builtin.get_url:
+       url: https://ollama.com/install.sh
+       dest: /tmp/ollama-install.sh
+       mode: '0755'
+     become: yes
+
+   - name: Install Ollama
+     ansible.builtin.shell: |
+       sh /tmp/ollama-install.sh
+     become: yes
+     args:
+       creates: /usr/local/bin/ollama
+
+   - name: Start and enable Ollama service
+     ansible.builtin.systemd:
+       name: ollama
+       enabled: yes
+       state: started
+     become: yes
+
+   - name: Create RAG directory
+     ansible.builtin.file:
+       path: "{{ aws_base_path }}/RAG"
+       state: directory
+       mode: '0755'
+
+   - name: Copy RAG files
+     ansible.builtin.copy:
+       src: ./
+       dest: "{{ aws_base_path }}/RAG/"
+       mode: '0644'
+       directory_mode: '0755'
+
+   - name: Create Python virtual environment
+     ansible.builtin.command:
+       cmd: python3 -m venv {{ aws_base_path }}/RAG/venv
+       creates: "{{ aws_base_path }}/RAG/venv"
+
+   - name: Install Python dependencies in venv
+     ansible.builtin.pip:
+       requirements: "{{ aws_base_path }}/RAG/requirements.txt"
+       virtualenv: "{{ aws_base_path }}/RAG/venv"
+
+   - name: Pull llama2 model
+     ansible.builtin.shell: |
+       ollama pull llama2
+     become: yes
+     register: ollama_pull_result
+     changed_when: "'pulling manifest' in ollama_pull_result.stdout"
+
+   - name: Create RAG environment file
+     ansible.builtin.copy:
+       content: |
+         BACKEND_API_URL=http://localhost:8081
+       dest: "{{ aws_base_path }}/RAG/.env"
+       mode: '0644'
+
+   - name: Create systemd service file for RAG agent
+     ansible.builtin.copy:
+       content: |
+         [Unit]
+         Description=RAG Agent HTTP Server
+         After=network.target ollama.service
+         Requires=ollama.service
+
+         [Service]
+         Type=simple
+         User=andy
+         WorkingDirectory={{ aws_base_path }}/RAG
+         ExecStart={{ aws_base_path }}/RAG/venv/bin/python {{ aws_base_path }}/RAG/agent.py
+         Restart=always
+         RestartSec=10
+         Environment="BACKEND_API_URL=http://localhost:8081"
+         Environment="RAG_PORT=8082"
+         Environment="RAG_HOST=0.0.0.0"
+         StandardOutput=journal
+         StandardError=journal
+
+         [Install]
+         WantedBy=multi-user.target
+       dest: /etc/systemd/system/rag-agent.service
+       mode: '0644'
+     become: yes
+
+   - name: Reload systemd daemon
+     ansible.builtin.systemd:
+       daemon_reload: yes
+     become: yes
+
+   - name: Enable and start RAG agent service
+     ansible.builtin.systemd:
+       name: rag-agent
+       enabled: yes
+       state: restarted
+     become: yes
