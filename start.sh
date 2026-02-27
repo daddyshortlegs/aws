@@ -1,4 +1,5 @@
 #!/bin/bash
+set -m
 
 cd backend && cargo run &
 PID=$!

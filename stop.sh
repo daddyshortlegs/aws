@@ -13,23 +13,23 @@ while IFS= read -r pid; do
     if [ -n "$pid" ]; then
         echo "Stopping process with PID: $pid"
         
-        # Check if the process is still running
-        if kill -0 "$pid" 2>/dev/null; then
+        # Check if the process group is still running
+        if kill -0 -- "-$pid" 2>/dev/null; then
             # Try graceful termination first
-            kill -TERM "$pid" 2>/dev/null
-            
+            kill -TERM -- "-$pid" 2>/dev/null
+
             # Wait a bit for graceful shutdown
             sleep 2
-            
-            # Check if process is still running
-            if kill -0 "$pid" 2>/dev/null; then
-                echo "Process $pid still running, force killing..."
-                kill -KILL "$pid" 2>/dev/null
+
+            # Check if process group is still running
+            if kill -0 -- "-$pid" 2>/dev/null; then
+                echo "Process group $pid still running, force killing..."
+                kill -KILL -- "-$pid" 2>/dev/null
             else
-                echo "Process $pid stopped gracefully"
+                echo "Process group $pid stopped gracefully"
             fi
         else
-            echo "Process $pid is not running"
+            echo "Process group $pid is not running"
         fi
     fi
 done < services.pid
