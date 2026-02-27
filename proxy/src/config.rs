@@ -10,7 +10,8 @@ pub struct Config {
 
 impl Config {
     pub fn load() -> Result<Self, Box<dyn std::error::Error>> {
-        let backend_url = env::var("BACKEND_URL").unwrap_or_else(|_| "http://127.0.0.1:8081".to_string());
+        let backend_url =
+            env::var("BACKEND_URL").unwrap_or_else(|_| "http://127.0.0.1:8081".to_string());
         let proxy_port = env::var("PROXY_PORT")
             .unwrap_or_else(|_| "8080".to_string())
             .parse()

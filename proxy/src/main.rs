@@ -3,7 +3,7 @@ use axum::{
     extract::State,
     http::Request,
     response::IntoResponse,
-    routing::{get, post, delete},
+    routing::{delete, get, post},
     Router,
 };
 use std::sync::Arc;
@@ -20,7 +20,7 @@ use proxy_service::ProxyService;
 async fn main() {
     // Load configuration
     let config = Config::load().expect("Failed to load configuration");
-    
+
     // Initialize tracing
     tracing_subscriber::registry()
         .with(tracing_subscriber::EnvFilter::new(&config.log_level))
@@ -54,10 +54,13 @@ async fn main() {
     let listener = tokio::net::TcpListener::bind(format!("127.0.0.1:{}", config.proxy_port))
         .await
         .unwrap();
-    
-    tracing::info!("Proxy server listening on {}", listener.local_addr().unwrap());
+
+    tracing::info!(
+        "Proxy server listening on {}",
+        listener.local_addr().unwrap()
+    );
     tracing::info!("Proxying requests to backend at {}", config.backend_url);
-    
+
     axum::serve(listener, app).await.unwrap();
 }
 
@@ -69,7 +72,8 @@ async fn proxy_handler(
     let uri = request.uri().clone();
     let headers = request.headers().clone();
     let body = Some(request.into_body());
-    
-    proxy_service.proxy_request(method, uri, headers, body, None).await
-}
 
+    proxy_service
+        .proxy_request(method, uri, headers, body, None)
+        .await
+}

@@ -32,7 +32,7 @@ impl ProxyService {
     ) -> impl IntoResponse {
         let path = uri.path();
         let backend_url = format!("{}{}", self.backend_url, path);
-        
+
         info!("Proxying {} {} -> {}", method, path, backend_url);
 
         // Convert Axum Method to Reqwest Method
@@ -75,14 +75,11 @@ impl ProxyService {
                 Ok(bytes) => bytes,
                 Err(e) => {
                     error!("Failed to read body: {}", e);
-                    return (
-                        StatusCode::BAD_REQUEST,
-                        "Failed to read request body",
-                    )
+                    return (StatusCode::BAD_REQUEST, "Failed to read request body")
                         .into_response();
                 }
             };
-            
+
             // Convert to Reqwest Body
             let reqwest_body = reqwest::Body::from(body_bytes);
             request_builder.body(reqwest_body).build().unwrap()
@@ -100,11 +97,11 @@ impl ProxyService {
                 info!("Backend response: {}", status);
 
                 // Convert Reqwest status to Axum status
-                let axum_status = StatusCode::from_u16(status.as_u16()).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
+                let axum_status = StatusCode::from_u16(status.as_u16())
+                    .unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
 
                 // Convert response back to axum response
-                let mut response_builder = axum::http::Response::builder()
-                    .status(axum_status);
+                let mut response_builder = axum::http::Response::builder().status(axum_status);
 
                 // Copy headers from backend response
                 for (key, value) in headers.iter() {
