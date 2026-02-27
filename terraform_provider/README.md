@@ -16,12 +16,6 @@ From this directory (`terraform_provider/`):
 make build
 ```
 
-Or with Go directly:
-
-```bash
-go build -o terraform-provider-aws2 .
-```
-
 The binary is named `terraform-provider-aws2` to match the provider source type `aws2`.
 
 ## Use with Terraform (dev overrides)

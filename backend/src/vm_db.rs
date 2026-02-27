@@ -2,6 +2,7 @@ use crate::config::Config;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
+use tracing::debug;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct VmInfo {
@@ -12,13 +13,13 @@ pub struct VmInfo {
 }
 
 pub fn store_vm_info(vm_info: &VmInfo) -> std::io::Result<()> {
-    println!("Storing VM info: {vm_info:?}");
+    debug!("Storing VM info: {vm_info:?}");
 
     let file_path = create_file_path(&vm_info.id)?;
 
     let json = serde_json::to_string_pretty(&vm_info)?;
-    println!("Writing VM info to: {file_path:?}");
-    println!("VM info: {json:?}");
+    debug!("Writing VM info to: {file_path:?}");
+    debug!("VM info: {json:?}");
     fs::write(file_path, json)
 }
 

@@ -2,6 +2,7 @@ use crate::config::Config;
 use crate::qemu::vm_start;
 use crate::vm_db::{delete_vm_by_id, get_vm_by_id, list_vms, store_vm_info, VmInfo};
 use axum::{http::StatusCode, response::IntoResponse, Json};
+use tracing::{debug, error, info, warn};
 use nix::sys::signal::{kill, Signal};
 use nix::unistd::Pid;
 use rand::Rng;
@@ -38,8 +39,8 @@ pub async fn launch_vm(
         .qcow2_dir
         .join(format!("{}.qcow2", payload.name));
 
-    println!("source_qcow2: {source_qcow2:?}");
-    println!("target_qcow2: {target_qcow2:?}");
+    debug!("source_qcow2: {source_qcow2:?}");
+    debug!("target_qcow2: {target_qcow2:?}");
 
     // Copy the QCOW2 file
     if let Err(e) = fs::copy(&source_qcow2, &target_qcow2).await {
@@ -126,10 +127,10 @@ pub async fn start_all_vms() {
 
                 let _ = store_vm_info(&vm_info);
 
-                println!("VM {} started with PID: {}", vm.name, child.id().unwrap());
+                info!("VM {} started with PID: {}", vm.name, child.id().unwrap());
             }
             Err(e) => {
-                println!("Failed to start VM {}: {}", vm.name, e);
+                error!("Failed to start VM {}: {}", vm.name, e);
             }
         }
     }
@@ -141,7 +142,7 @@ pub struct DeleteVmRequest {
 }
 
 pub async fn delete_vm_handler(Json(payload): Json<DeleteVmRequest>) -> impl IntoResponse {
-    println!("Deleting VM: {payload:?}");
+    info!("Deleting VM: {payload:?}");
 
     match get_vm_by_id(&payload.id) {
         Ok(Some(vm_info)) => {
@@ -153,7 +154,7 @@ pub async fn delete_vm_handler(Json(payload): Json<DeleteVmRequest>) -> impl Int
 
                     // Check if process is still running, if so, force kill it
                     if kill(Pid::from_raw(vm_info.pid as i32), Signal::SIGKILL).is_ok() {
-                        println!("Process {} was still running, force killed", vm_info.pid);
+                        warn!("Process {} was still running, force killed", vm_info.pid);
                     }
 
                     // Delete the JSON file using the same path as other operations
@@ -164,7 +165,7 @@ pub async fn delete_vm_handler(Json(payload): Json<DeleteVmRequest>) -> impl Int
                         .join(format!("{}.json", vm_info.id));
 
                     if let Err(e) = fs::remove_file(&file_path).await {
-                        println!("Error deleting VM info file: {file_path:?} - {e}");
+                        error!("Error deleting VM info file: {file_path:?} - {e}");
                         return (
                             StatusCode::INTERNAL_SERVER_ERROR,
                             "Failed to delete VM info file",
@@ -179,11 +180,11 @@ pub async fn delete_vm_handler(Json(payload): Json<DeleteVmRequest>) -> impl Int
                         .join(format!("{}.qcow2", vm_info.name));
 
                     if let Err(e) = fs::remove_file(&qcow2_file_path).await {
-                        println!("Warning: Could not delete QCOW2 file: {qcow2_file_path:?} - {e}");
+                        warn!("Could not delete QCOW2 file: {qcow2_file_path:?} - {e}");
                         // Don't fail the entire operation if QCOW2 deletion fails
                         // The JSON metadata is more important to clean up
                     } else {
-                        println!("Successfully deleted QCOW2 file: {qcow2_file_path:?}");
+                        info!("Successfully deleted QCOW2 file: {qcow2_file_path:?}");
                     }
 
                     let _ = delete_vm_by_id(&vm_info.id);
@@ -191,7 +192,7 @@ pub async fn delete_vm_handler(Json(payload): Json<DeleteVmRequest>) -> impl Int
                     (StatusCode::OK, "VM successfully terminated and removed").into_response()
                 }
                 Err(e) => {
-                    println!("Error terminating process {}: {}", vm_info.pid, e);
+                    error!("Error terminating process {}: {}", vm_info.pid, e);
                     (
                         StatusCode::INTERNAL_SERVER_ERROR,
                         format!("Failed to terminate VM: {e}"),
@@ -202,7 +203,7 @@ pub async fn delete_vm_handler(Json(payload): Json<DeleteVmRequest>) -> impl Int
         }
         Ok(None) => (StatusCode::NOT_FOUND, "VM not found").into_response(),
         Err(e) => {
-            println!("Error retrieving VM info: {e}");
+            error!("Error retrieving VM info: {e}");
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 format!("Error retrieving VM info: {e}"),
