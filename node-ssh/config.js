@@ -8,20 +8,20 @@ module.exports = {
     // key: process.env.SSH_KEY_PATH,
     // password: process.env.SSH_PASSWORD,
   },
-  
+
   // Server configuration
   server: {
     port: process.env.PORT || 3001,
     host: process.env.HOST || '0.0.0.0',
   },
-  
+
   // Terminal configuration
   terminal: {
     cols: 120,
     rows: 30,
     name: 'xterm-color',
   },
-  
+
   // Logging configuration
   logging: {
     level: process.env.LOG_LEVEL || 'info',

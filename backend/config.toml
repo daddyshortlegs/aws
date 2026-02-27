@@ -2,4 +2,4 @@
 # Directory where QCOW2 files are stored
 qcow2_dir = "/Users/asmith/home-git/aws/vm-data"
 # Directory where VM metadata JSON files are stored
-metadata_dir = "/Users/asmith/home-git/aws/vm-data" 
+metadata_dir = "/Users/asmith/home-git/aws/vm-data"

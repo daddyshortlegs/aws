@@ -19,4 +19,4 @@ tokio-tungstenite = "0.21"
 futures-util = { version = "0.3", default-features = false, features = ["std"] }
 
 [dev-dependencies]
-tempfile = "3.10" 
+tempfile = "3.10"

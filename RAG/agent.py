@@ -41,7 +41,7 @@ class SimpleRAG:
         )
 
         self.api_base_url = api_base_url.rstrip('/')
-  
+
     def extractJsonFromResponse(self, response: str) -> Optional[Dict[str, any]]:
         try:
             start_idx = response.find('{')
@@ -53,7 +53,7 @@ class SimpleRAG:
                     return result
         except (json.JSONDecodeError, ValueError) as e:
             logger.warning(f"Could not parse API operation detection: {e}")
-        
+
         return None
 
     def _detect_api_operation(self, question: str) -> Optional[Dict[str, any]]:
@@ -94,14 +94,14 @@ class SimpleRAG:
 
 
         message: ChatResponse = self.client.chat(self.model, messages=messages)
-        
+
         response = message.message.content
         logger.info(f"LLM response: {response}")
 
         result = self.extractJsonFromResponse(response)
         if result:
             return result
-        
+
         return None
 
     def _call_api(self, operation: str, params: Dict) -> Dict[str, any]:
@@ -136,8 +136,8 @@ class SimpleRAG:
                 "operation": operation,
                 "error": f"Unexpected error: {str(e)}"
             }
-    
-    
+
+
     def _launch_vm(self, params: Dict, client: httpx.Client) -> Dict[str, any]:
         payload = {
             "name": params.get("name", "unnamed-vm"),
@@ -218,25 +218,25 @@ class SimpleRAG:
     def query(self, question: str) -> Dict[str, any]:
         """
         Query the RAG agent. Can handle both API operations and document queries.
-        
+
         Args:
             question: The question to ask or API operation to perform
-            
+
         Returns:
             Dictionary with 'answer', 'context', 'api_result' keys
         """
         # First, check if this is an API operation
         logger.info("Detecting if this is an API operation...")
         api_op = self._detect_api_operation(question)
-        
+
         if api_op and api_op.get("operation"):
             # This is an API operation
             operation = api_op["operation"]
             params = api_op.get("params", {})
-            
+
             logger.info(f"Detected API operation: {operation} with params: {params}")
             api_result = self._call_api(operation, params)
-            
+
             # Format the result for the user
             if api_result["success"]:
                 if operation == "launch-vm":
@@ -259,13 +259,13 @@ class SimpleRAG:
                     answer = f"✅ VM deleted successfully!\n{api_result.get('data', {}).get('message', 'VM removed')}"
             else:
                 answer = f"❌ Error performing {operation}: {api_result.get('error', 'Unknown error')}"
-            
+
             return {
                 "answer": answer,
                 "api_result": api_result,
                 "is_api_operation": True
             }
-        
+
         # Not an API operation - use Ollama to answer the question
         logger.info(f"Querying {self.model} for general question...")
 
@@ -276,7 +276,7 @@ class SimpleRAG:
             }
         ]
         response: ChatResponse = self.client.chat(self.model, messages=messages)
-        
+
         return {
             "answer": response.message.content,
             "is_api_operation": False
@@ -313,7 +313,7 @@ def health():
 def query_endpoint(request: QueryRequest):
     """
     Main query endpoint. Accepts natural language questions and VM operations.
-    
+
     Examples:
     - "create a VM called my-vm"
     - "list all VMs"

@@ -161,4 +161,3 @@ The modular structure makes it easy to add features:
 ## License
 
 ISC
-

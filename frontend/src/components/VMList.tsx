@@ -20,7 +20,7 @@ const VMList: React.FC<VMListProps> = ({ refreshKey = 0 }) => {
     try {
       setLoading(true);
       setError(null);
-      
+
       const response = await fetch(getApiUrl('listVMs'), {
         method: 'GET',
         headers: {
@@ -67,7 +67,7 @@ const VMList: React.FC<VMListProps> = ({ refreshKey = 0 }) => {
 
       const result = await response.text();
       console.log('Delete result:', result);
-      
+
       // Refresh the VM list after successful deletion
       await fetchVMs();
     } catch (err) {
@@ -159,7 +159,7 @@ const VMList: React.FC<VMListProps> = ({ refreshKey = 0 }) => {
                       </td>
                       <td>
                         <div className="btn-group" role="group">
-                          <button 
+                          <button
                             className="btn btn-outline-primary btn-sm"
                             onClick={() => handleConnect(vm.name, vm.ssh_port)}
                             title={`Open SSH terminal for ${vm.name} in new tab`}
@@ -169,7 +169,7 @@ const VMList: React.FC<VMListProps> = ({ refreshKey = 0 }) => {
                           <button className="btn btn-outline-warning btn-sm">
                             Stop
                           </button>
-                          <button 
+                          <button
                             className="btn btn-outline-danger btn-sm"
                             onClick={() => deleteVM(vm.id, vm.name)}
                             disabled={deletingVM === vm.id}
@@ -197,4 +197,4 @@ const VMList: React.FC<VMListProps> = ({ refreshKey = 0 }) => {
   );
 };
 
-export default VMList; 
+export default VMList;

@@ -125,7 +125,7 @@ impl ProxyService {
                 error!("Proxy request failed: {}", e);
                 (
                     StatusCode::BAD_GATEWAY,
-                    format!("Failed to proxy request: {}", e),
+                    format!("Failed to proxy request: {e}"),
                 )
                     .into_response()
             }

@@ -23,7 +23,7 @@ function App() {
         <Routes>
           {/* Terminal route - full screen terminal */}
           <Route path="/terminal" element={<TerminalPage />} />
-          
+
           {/* Main application route */}
           <Route path="/*" element={
             <>
@@ -54,7 +54,7 @@ function App() {
                   <div className="col-12">
                     <div className="d-flex justify-content-between align-items-center mb-4">
                       <h1>Virtual Machine Management</h1>
-                      <button 
+                      <button
                         className="btn btn-primary"
                         onClick={() => setIsModalOpen(true)}
                       >

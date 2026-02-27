@@ -42,5 +42,3 @@ nc -U /tmp/qemu-monitor.sock
 ```
 
 Once connected you can issue commands, e.g. `system_powerdown`
-
-

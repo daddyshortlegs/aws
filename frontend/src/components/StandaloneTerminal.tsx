@@ -39,7 +39,7 @@ const StandaloneTerminal: React.FC<StandaloneTerminalProps> = ({ vmName, sshPort
     terminal.loadAddon(webLinksAddon);
 
     terminal.open(terminalRef.current);
-    
+
     // Fit terminal to container
     setTimeout(() => {
       fitAddon.fit();
@@ -53,14 +53,14 @@ const StandaloneTerminal: React.FC<StandaloneTerminalProps> = ({ vmName, sshPort
 
     // Create WebSocket connection with dynamic port
     const socket = new WebSocket(`ws://localhost:3001?port=${sshPort}`);
-  
+
     socket.onopen = () => {
       setIsConnected(true);
       setConnectionError(null);
       terminal.writeln(`\r\n\x1b[32m✓ Connected to ${vmName} on port ${sshPort}\x1b[0m`);
       terminal.writeln('\r\n');
     };
-  
+
     socket.onmessage = (event) => {
       terminal.write(event.data);
     };
@@ -74,7 +74,7 @@ const StandaloneTerminal: React.FC<StandaloneTerminalProps> = ({ vmName, sshPort
       setIsConnected(false);
       terminal.writeln('\r\n\x1b[33m⚠ Connection closed\x1b[0m\r\n');
     };
-  
+
     terminal.onData((data) => {
       if (socket.readyState === WebSocket.OPEN) {
         socket.send(data);
@@ -121,8 +121,8 @@ const StandaloneTerminal: React.FC<StandaloneTerminalProps> = ({ vmName, sshPort
           }}>
             {isConnected ? 'Connected' : 'Disconnected'}
           </span>
-          <button 
-            className="btn btn-sm btn-outline-light" 
+          <button
+            className="btn btn-sm btn-outline-light"
             onClick={handleClose}
             style={{ marginRight: '10px' }}
           >
@@ -132,10 +132,10 @@ const StandaloneTerminal: React.FC<StandaloneTerminalProps> = ({ vmName, sshPort
       </div>
 
       {/* Terminal Content */}
-      <div 
-        ref={terminalRef} 
+      <div
+        ref={terminalRef}
         className="terminal-content"
-        style={{ 
+        style={{
           flex: 1,
           backgroundColor: '#1e1e1e',
           padding: '10px'

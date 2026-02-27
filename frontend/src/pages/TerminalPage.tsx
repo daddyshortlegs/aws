@@ -51,9 +51,9 @@ const TerminalPage: React.FC = () => {
           <p style={{ color: '#6c757d', marginBottom: '20px' }}>
             The terminal URL is missing required parameters or contains invalid values.
           </p>
-          <div style={{ 
-            backgroundColor: '#f8f9fa', 
-            padding: '15px', 
+          <div style={{
+            backgroundColor: '#f8f9fa',
+            padding: '15px',
             borderRadius: '4px',
             fontFamily: 'monospace',
             fontSize: '14px',
@@ -65,7 +65,7 @@ const TerminalPage: React.FC = () => {
             <div>Example:</div>
             <div>/terminal?vm=my-vm&port=22</div>
           </div>
-          <button 
+          <button
             onClick={() => window.close()}
             style={{
               marginTop: '20px',

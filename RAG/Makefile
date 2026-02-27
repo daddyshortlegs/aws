@@ -8,4 +8,3 @@ clean:
 	rm -rf target
 
 all: deploy
-

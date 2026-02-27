@@ -51,15 +51,15 @@ const SSHTerminal: React.FC<SSHTerminalProps> = ({ vmName, sshPort, onClose }) =
 
 
     const socket = new WebSocket(`ws://localhost:3001?port=${sshPort}`);
-  
+
     socket.onopen = () => {
       terminal.writeln('Connected to server.');
     };
-  
+
     socket.onmessage = (event) => {
       terminal.write(event.data);
     };
-  
+
     terminal.onData((data) => {
       socket.send(data);
     });
@@ -85,11 +85,11 @@ const SSHTerminal: React.FC<SSHTerminalProps> = ({ vmName, sshPort, onClose }) =
           <i className="bi bi-x"></i>
         </button>
       </div>
-      <div 
-        ref={terminalRef} 
+      <div
+        ref={terminalRef}
         className="terminal-content"
-        style={{ 
-          height: '400px', 
+        style={{
+          height: '400px',
           backgroundColor: '#1e1e1e',
           padding: '10px'
         }}
@@ -98,4 +98,4 @@ const SSHTerminal: React.FC<SSHTerminalProps> = ({ vmName, sshPort, onClose }) =
   );
 };
 
-export default SSHTerminal; 
+export default SSHTerminal;

@@ -24,22 +24,22 @@
   <script>
     const term = new Terminal();
     term.open(document.getElementById('terminal'));
-  
+
     const socket = new WebSocket('ws://localhost:3001');
-  
+
     socket.onopen = () => {
       term.writeln('Connected to server.');
     };
-  
+
     socket.onmessage = (event) => {
       term.write(event.data);
     };
-  
+
     term.onData((data) => {
       socket.send(data);
     });
   </script>
-  
+
 
 </body>
 </html>

@@ -25,19 +25,19 @@ type LaunchVMRequest struct {
 
 // LaunchVMResponse is the response from POST /launch-vm.
 type LaunchVMResponse struct {
-	Success     bool   `json:"success"`
-	Message     string `json:"message"`
-	InstanceID  string `json:"instance_id"`
-	SSHPort     int    `json:"ssh_port"`
-	PID         int    `json:"pid"`
+	Success    bool   `json:"success"`
+	Message    string `json:"message"`
+	InstanceID string `json:"instance_id"`
+	SSHPort    int    `json:"ssh_port"`
+	PID        int    `json:"pid"`
 }
 
 // VMInfo is a single VM from GET /list-vms.
 type VMInfo struct {
-	ID       string `json:"id"`
-	Name     string `json:"name"`
-	SSHPort  int    `json:"ssh_port"`
-	PID      int    `json:"pid"`
+	ID      string `json:"id"`
+	Name    string `json:"name"`
+	SSHPort int    `json:"ssh_port"`
+	PID     int    `json:"pid"`
 }
 
 // DeleteVMRequest is the body for DELETE /delete-vm.

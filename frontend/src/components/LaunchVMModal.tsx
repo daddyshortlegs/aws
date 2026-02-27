@@ -33,7 +33,7 @@ const LaunchVMModal: React.FC<LaunchVMModalProps> = ({ isOpen, onClose, onLaunch
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!vmName.trim()) {
       setError('VM name is required');
       return;
@@ -60,7 +60,7 @@ const LaunchVMModal: React.FC<LaunchVMModalProps> = ({ isOpen, onClose, onLaunch
       }
 
       const data = await response.json();
-      
+
       if (data.success) {
         onLaunch(vmName.trim(), instanceType);
         handleClose();
@@ -106,7 +106,7 @@ const LaunchVMModal: React.FC<LaunchVMModalProps> = ({ isOpen, onClose, onLaunch
                     {error}
                   </div>
                 )}
-                
+
                 <div className="mb-3">
                   <label htmlFor="vmName" className="form-label">
                     VM Name *
@@ -188,4 +188,4 @@ const LaunchVMModal: React.FC<LaunchVMModalProps> = ({ isOpen, onClose, onLaunch
   );
 };
 
-export default LaunchVMModal; 
+export default LaunchVMModal;

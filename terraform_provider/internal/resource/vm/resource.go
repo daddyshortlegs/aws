@@ -27,8 +27,8 @@ type vmResourceModel struct {
 	Name         types.String `tfsdk:"name"`
 	InstanceType types.String `tfsdk:"instance_type"`
 	Region       types.String `tfsdk:"region"`
-	SSHPort      types.Int64   `tfsdk:"ssh_port"`
-	PID          types.Int64   `tfsdk:"pid"`
+	SSHPort      types.Int64  `tfsdk:"ssh_port"`
+	PID          types.Int64  `tfsdk:"pid"`
 }
 
 func NewVMResource() resource.Resource {

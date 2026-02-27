@@ -13,7 +13,7 @@ const server = http.createServer((req, res) => {
     res.end(JSON.stringify({ status: 'ok', timestamp: new Date().toISOString() }));
     return;
   }
-  
+
   // Default response for other routes
   res.writeHead(404, { 'Content-Type': 'text/plain' });
   res.end('Not Found');
@@ -27,20 +27,20 @@ wss.on('connection', (ws, req) => {
   if (config.logging.enableConnectionLogging) {
     console.log('Client connected from:', req.socket.remoteAddress);
   }
-  
+
   // Parse query parameters from the WebSocket connection URL
   const parsedUrl = url.parse(req.url, true);
   const query = parsedUrl.query;
-  
+
   // Extract SSH connection parameters from query string
   const sshHost = query.host || config.ssh.host;
   const sshPort = parseInt(query.port) || config.ssh.port;
   const sshUser = query.user || config.ssh.user;
-  
+
   if (config.logging.enableConnectionLogging) {
     console.log(`SSH connection parameters: ${sshUser}@${sshHost}:${sshPort}`);
   }
-  
+
   // Spawn SSH shell with dynamic parameters
   const shell = os.platform() === 'win32' ? 'powershell.exe' : 'bash';
   const ssh = pty.spawn('ssh', [

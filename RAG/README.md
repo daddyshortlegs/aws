@@ -8,7 +8,7 @@ A minimal Retrieval-Augmented Generation agent using local models via Ollama. No
    ```bash
    # On macOS
    brew install ollama
-   
+
    # Or download from https://ollama.ai
    ```
 

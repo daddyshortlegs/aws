@@ -28,10 +28,10 @@ const TerminalModal: React.FC<TerminalModalProps> = ({ isOpen, onClose, vmName, 
               ></button>
             </div>
             <div className="modal-body p-0">
-              <SSHTerminal 
-                vmName={vmName} 
-                sshPort={sshPort} 
-                onClose={onClose} 
+              <SSHTerminal
+                vmName={vmName}
+                sshPort={sshPort}
+                onClose={onClose}
               />
             </div>
           </div>
@@ -42,4 +42,4 @@ const TerminalModal: React.FC<TerminalModalProps> = ({ isOpen, onClose, vmName, 
   );
 };
 
-export default TerminalModal; 
+export default TerminalModal;

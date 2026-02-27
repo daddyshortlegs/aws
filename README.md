@@ -59,3 +59,16 @@ The VM Orchestrator consists of several interconnected components:
 Run the `make all` command. This will deploy using Ansible. When completed, the UI can be access at:
 
 http://10.0.0.1
+
+## Git hooks
+
+```
+brew bundle
+pre-commit install          # installs the git hook
+```
+
+Then to run against all files once (useful after first install):
+
+```
+pre-commit run --all-files
+```

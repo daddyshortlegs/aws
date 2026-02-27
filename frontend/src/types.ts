@@ -7,4 +7,4 @@ export interface VM {
 
 export interface VMListResponse {
   vms: VM[];
-} 
+}

@@ -1,2 +1,2 @@
-brew "zig"
+brew "pre-commit"
 brew "qemu"

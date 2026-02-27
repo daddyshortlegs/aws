@@ -6,7 +6,7 @@ export const config = {
     port: parseInt(process.env.REACT_APP_BACKEND_PORT || '8080', 10),
     protocol: process.env.REACT_APP_BACKEND_PROTOCOL || 'http',
   },
-  
+
   // Get the full backend URL.
   // In production (no REACT_APP_BACKEND_HOST set) use a relative /api path so
   // requests stay on the same origin and are proxied by nginx — no CORS needed.
@@ -18,7 +18,7 @@ export const config = {
     }
     return `/api${endpoint}`;
   },
-  
+
   // Common API endpoints
   endpoints: {
     launchVM: '/launch-vm',

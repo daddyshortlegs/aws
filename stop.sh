@@ -12,7 +12,7 @@ echo "Stopping services..."
 while IFS= read -r pid; do
     if [ -n "$pid" ]; then
         echo "Stopping process with PID: $pid"
-        
+
         # Check if the process group is still running
         if kill -0 -- "-$pid" 2>/dev/null; then
             # Try graceful termination first
