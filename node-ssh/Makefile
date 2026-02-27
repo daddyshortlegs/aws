@@ -1,8 +1,11 @@
-.PHONY: build run deploy all clean
+.PHONY: build run audit deploy all clean
 
 BUILD_DIR := build
 
-build:
+audit:
+	npm audit --audit-level=high
+
+build: audit
 	npm install
 
 run:

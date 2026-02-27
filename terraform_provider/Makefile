@@ -1,8 +1,11 @@
-.PHONY: build clean
+.PHONY: build audit clean
 
 BINARY := terraform-provider-aws2
 
-build:
+audit:
+	govulncheck ./...
+
+build: audit
 	go build -o $(BINARY) .
 
 clean:

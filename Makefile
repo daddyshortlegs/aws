@@ -1,8 +1,27 @@
 .PHONY: build build-backend build-proxy build-frontend build-node-ssh \
 	build-linux build-linux-backend build-linux-proxy \
+	audit audit-backend audit-proxy audit-frontend audit-node-ssh audit-terraform \
 	dev run start stop \
 	deploy deploy-backend deploy-proxy deploy-frontend deploy-node-ssh \
 	all clean
+
+# ── Audit ────────────────────────────────────────────────────────────────────
+audit-backend:
+	cd backend && $(MAKE) audit
+
+audit-proxy:
+	cd proxy && $(MAKE) audit
+
+audit-frontend:
+	cd frontend && $(MAKE) audit
+
+audit-node-ssh:
+	cd node-ssh && $(MAKE) audit
+
+audit-terraform:
+	cd terraform_provider && $(MAKE) audit
+
+audit: audit-backend audit-proxy audit-frontend audit-node-ssh audit-terraform
 
 # ── Local / CI native build ──────────────────────────────────────────────────
 build-backend:

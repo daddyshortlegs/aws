@@ -1,7 +1,10 @@
-.PHONY: build build-linux run deploy all clean
+.PHONY: build build-linux run audit deploy all clean
+
+audit:
+	cargo audit
 
 # Native build — works on Mac (dev/test) and Linux (CI)
-build:
+build: audit
 	cargo build --release
 
 # Cross-compile for Linux x86_64 via container — use when deploying from Mac

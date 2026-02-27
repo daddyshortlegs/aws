@@ -1,6 +1,9 @@
-.PHONY: build deploy all
+.PHONY: build audit deploy all
 
-build:
+audit:
+	npm audit --audit-level=high
+
+build: audit
 	npm run build
 
 deploy:
