@@ -52,3 +52,10 @@ The VM Orchestrator consists of several interconnected components:
 | Backend | 8081 | `PORT` | VM management API |
 | Proxy | 8080 | `PROXY_PORT` | HTTP request forwarding |
 | SSH Server | 3001 | `PORT` | WebSocket SSH terminal |
+
+
+## Deployment to Linux servers
+
+Run the `make all` command. This will deploy using Ansible. When completed, the UI can be access at:
+
+http://10.0.0.1
