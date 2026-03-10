@@ -1,3 +1,5 @@
+proxy_url = "http://127.0.0.1:8080"
+
 [storage]
 # Directory where QCOW2 files are stored
 qcow2_dir = "/Users/asmith/home-git/aws/vm-data"

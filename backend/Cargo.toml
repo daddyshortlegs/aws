@@ -15,6 +15,7 @@ rand = "0.8"
 uuid = { version = "1.7", features = ["v4", "serde"] }
 nix = { version = "0.27", features = ["signal"] }
 config = "0.14"
+reqwest = { version = "0.11", features = ["json"] }
 tokio-tungstenite = "0.21"
 futures-util = { version = "0.3", default-features = false, features = ["std"] }
 

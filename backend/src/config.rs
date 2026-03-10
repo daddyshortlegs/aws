@@ -9,6 +9,7 @@ pub struct StorageConfig {
 
 #[derive(Debug, Deserialize)]
 pub struct Config {
+    pub proxy_url: String,
     pub storage: StorageConfig,
 }
 

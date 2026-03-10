@@ -6,15 +6,17 @@ use axum::{
 };
 use reqwest::Client;
 use std::collections::HashMap;
+use std::sync::Arc;
+use tokio::sync::RwLock;
 use tracing::{error, info};
 
 pub struct ProxyService {
     client: Client,
-    backend_url: String,
+    pub backend_url: Arc<RwLock<Option<String>>>,
 }
 
 impl ProxyService {
-    pub fn new(backend_url: String) -> Self {
+    pub fn new(backend_url: Arc<RwLock<Option<String>>>) -> Self {
         let client = Client::new();
         Self {
             client,
@@ -31,8 +33,22 @@ impl ProxyService {
         query: Option<Query<HashMap<String, String>>>,
     ) -> impl IntoResponse {
         let path = uri.path();
-        let backend_url = format!("{}{}", self.backend_url, path);
 
+        let url = {
+            let guard = self.backend_url.read().await;
+            match guard.as_ref() {
+                Some(u) => u.clone(),
+                None => {
+                    return (
+                        StatusCode::SERVICE_UNAVAILABLE,
+                        "Backend not yet registered",
+                    )
+                        .into_response();
+                }
+            }
+        };
+
+        let backend_url = format!("{url}{path}");
         info!("Proxying {} {} -> {}", method, path, backend_url);
 
         // Convert Axum Method to Reqwest Method

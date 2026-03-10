@@ -7,6 +7,7 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 mod config;
 mod qemu;
+mod register;
 mod vm_db;
 mod vm_service;
 use vm_service::{delete_vm_handler, launch_vm, list_vms_handler, start_all_vms};
@@ -37,10 +38,18 @@ async fn main() {
 
     start_all_vms().await;
 
-    // Run it
+    // Bind first so we know the actual port before registering
     let listener = tokio::net::TcpListener::bind("127.0.0.1:8081")
         .await
         .unwrap();
-    tracing::info!("listening on {}", listener.local_addr().unwrap());
+    let bound_addr = listener.local_addr().unwrap();
+    tracing::info!("listening on {}", bound_addr);
+
+    // Announce ourselves to the proxy asynchronously so startup is not blocked
+    let proxy_url = config.proxy_url.clone();
+    tokio::spawn(async move {
+        register::register_with_proxy(&proxy_url, bound_addr).await;
+    });
+
     axum::serve(listener, app).await.unwrap();
 }
