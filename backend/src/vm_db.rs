@@ -144,4 +144,60 @@ mod tests {
         let result = delete_vm_by_id(dir.path(), "nonexistent").unwrap();
         assert!(result.is_none());
     }
+
+    #[test]
+    fn test_list_vms_empty_directory() {
+        let dir = TempDir::new().unwrap();
+        let vms = list_vms(dir.path()).unwrap();
+        assert!(vms.is_empty());
+    }
+
+    #[test]
+    fn test_list_vms_nonexistent_directory() {
+        let dir = TempDir::new().unwrap();
+        let nonexistent = dir.path().join("does-not-exist");
+        // Should return an empty list rather than an error
+        let vms = list_vms(&nonexistent).unwrap();
+        assert!(vms.is_empty());
+    }
+
+    #[test]
+    fn test_list_vms_skips_non_json_files() {
+        let dir = TempDir::new().unwrap();
+        std::fs::write(dir.path().join("readme.txt"), "not a vm").unwrap();
+        std::fs::write(dir.path().join("notes.md"), "also not a vm").unwrap();
+
+        let vm = create_test_vm("test-5", "Test VM 5");
+        store_vm_info(dir.path(), &vm).unwrap();
+
+        let vms = list_vms(dir.path()).unwrap();
+        assert_eq!(vms.len(), 1);
+        assert_eq!(vms[0].id, "test-5");
+    }
+
+    #[test]
+    fn test_list_vms_skips_corrupted_json() {
+        let dir = TempDir::new().unwrap();
+        // A .json file that is not valid VmInfo JSON
+        std::fs::write(dir.path().join("bad.json"), "{ this is not valid json }").unwrap();
+
+        let vm = create_test_vm("test-6", "Test VM 6");
+        store_vm_info(dir.path(), &vm).unwrap();
+
+        // The corrupted file should be silently skipped; the valid VM is returned
+        let vms = list_vms(dir.path()).unwrap();
+        assert_eq!(vms.len(), 1);
+        assert_eq!(vms[0].id, "test-6");
+    }
+
+    #[test]
+    fn test_get_vm_corrupted_json() {
+        let dir = TempDir::new().unwrap();
+        std::fs::write(dir.path().join("bad-id.json"), "not json at all").unwrap();
+
+        // Should surface an error rather than silently returning None
+        let result = get_vm_by_id(dir.path(), "bad-id");
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err().kind(), std::io::ErrorKind::InvalidData);
+    }
 }
