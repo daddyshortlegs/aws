@@ -39,7 +39,7 @@ async fn main() {
     start_all_vms().await;
 
     // Bind first so we know the actual port before registering
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:8081")
+    let listener = tokio::net::TcpListener::bind(format!("127.0.0.1:{}", config.listen_port))
         .await
         .unwrap();
     let bound_addr = listener.local_addr().unwrap();

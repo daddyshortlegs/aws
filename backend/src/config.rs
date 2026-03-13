@@ -9,6 +9,7 @@ pub struct StorageConfig {
 
 #[derive(Debug, Deserialize)]
 pub struct Config {
+    pub listen_port: u16,
     pub proxy_url: String,
     pub storage: StorageConfig,
 }
@@ -16,13 +17,19 @@ pub struct Config {
 impl Config {
     pub fn load() -> Result<Self, config::ConfigError> {
         let config_file = if std::env::var("CI").is_ok() {
-            "config.ci"
+            "config.ci".to_string()
         } else {
-            "config"
+            let env = std::env::var("APP_ENV").unwrap_or_else(|_| "config".to_string());
+            if env == "config" {
+                env
+            } else {
+                format!("config.{env}")
+            }
         };
 
         let config = config::Config::builder()
-            .add_source(config::File::with_name(config_file))
+            .set_default("listen_port", 8081)?
+            .add_source(config::File::with_name(&config_file))
             .build()?;
 
         config.try_deserialize()

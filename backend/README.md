@@ -1,16 +1,18 @@
 # Andy's Web Services
 
-To build for a Linux taget (if on Mac):
-
-```
-cargo build --target x86_64-unknown-linux-gnu --release
-```
-
 To run:
 
 ```
 cargo run
 ```
+
+another instance:
+
+```
+APP_ENV=backend2 cargo run
+```
+
+where backend2 refers to a TOML file called config.backend2.toml.
 
 To launch a VM:
 
