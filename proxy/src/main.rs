@@ -1,10 +1,10 @@
 use axum::{
     body::Body,
     extract::State,
-    http::Request,
+    http::{Request, Response, StatusCode},
     response::IntoResponse,
     routing::{delete, get, post},
-    Json, Router,
+    Router,
 };
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -13,22 +13,22 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 mod config;
 mod proxy_service;
+mod registry;
 
 use config::Config;
 use proxy_service::ProxyService;
+use registry::BackendRegistry;
 
 #[derive(Clone)]
-struct AppState {
-    proxy_service: Arc<ProxyService>,
-    backend_url: Arc<RwLock<Option<String>>>,
+pub struct AppState {
+    pub proxy_service: Arc<ProxyService>,
+    pub registry: Arc<RwLock<BackendRegistry>>,
 }
 
 #[tokio::main]
 async fn main() {
-    // Load configuration
     let config = Config::load().expect("Failed to load configuration");
 
-    // Initialize tracing
     tracing_subscriber::registry()
         .with(tracing_subscriber::EnvFilter::new(&config.log_level))
         .with(tracing_subscriber::fmt::layer())
@@ -36,35 +36,27 @@ async fn main() {
 
     tracing::info!("Starting proxy server with config: {:?}", config);
 
-    // Shared backend URL — starts as None until the backend registers
-    let backend_url: Arc<RwLock<Option<String>>> = Arc::new(RwLock::new(None));
-
-    let proxy_service = Arc::new(ProxyService::new(Arc::clone(&backend_url)));
-
+    let registry: Arc<RwLock<BackendRegistry>> = Arc::new(RwLock::new(BackendRegistry::new()));
+    let proxy_service = Arc::new(ProxyService::new(Arc::clone(&registry)));
     let state = AppState {
         proxy_service,
-        backend_url,
+        registry,
     };
 
-    // Configure CORS
     let cors = CorsLayer::new()
         .allow_origin(Any)
         .allow_methods(Any)
         .allow_headers(Any);
 
-    // Build our application with routes
     let app = Router::new()
-        .route("/register", post(register_handler))
-        // Specific API endpoints with explicit methods
-        .route("/launch-vm", post(proxy_handler))
-        .route("/list-vms", get(proxy_handler))
-        .route("/delete-vm", delete(proxy_handler))
-        // Catch-all route for any other endpoints
+        .route("/register", post(registry::register_handler))
+        .route("/launch-vm", post(launch_vm_handler))
+        .route("/list-vms", get(list_vms_handler))
+        .route("/delete-vm", delete(delete_vm_handler))
         .fallback(proxy_handler)
         .layer(cors)
         .with_state(state);
 
-    // Run it
     let listener = tokio::net::TcpListener::bind(format!("127.0.0.1:{}", config.proxy_port))
         .await
         .unwrap();
@@ -78,20 +70,103 @@ async fn main() {
     axum::serve(listener, app).await.unwrap();
 }
 
-#[derive(serde::Deserialize)]
-struct RegisterRequest {
-    ip: String,
-    port: u16,
+/// Round-robin /launch-vm: selects the next backend, forwards the request,
+/// and if the backend accepts it records the vm_id → backend mapping.
+async fn launch_vm_handler(
+    State(state): State<AppState>,
+    request: Request<Body>,
+) -> impl IntoResponse {
+    let backend_url = match state.registry.write().await.round_robin_url() {
+        Some(u) => u,
+        None => {
+            return (
+                StatusCode::SERVICE_UNAVAILABLE,
+                "Backend not yet registered",
+            )
+                .into_response();
+        }
+    };
+
+    let method = request.method().clone();
+    let uri = request.uri().clone();
+    let headers = request.headers().clone();
+    let body = Some(request.into_body());
+
+    let response = state
+        .proxy_service
+        .proxy_request_to(backend_url.clone(), method, uri, headers, body, None)
+        .await;
+
+    // Only record the VM→backend mapping if the launch succeeded.
+    if response.status().is_success() {
+        let (parts, resp_body) = response.into_parts();
+        let bytes = axum::body::to_bytes(resp_body, usize::MAX)
+            .await
+            .unwrap_or_default();
+        if let Ok(val) = serde_json::from_slice::<serde_json::Value>(&bytes) {
+            if let Some(vm_id) = val.get("instance_id").and_then(|v| v.as_str()) {
+                state
+                    .registry
+                    .write()
+                    .await
+                    .register_vm(vm_id.to_string(), backend_url);
+            }
+        }
+        return Response::from_parts(parts, Body::from(bytes)).into_response();
+    }
+
+    response.into_response()
 }
 
-async fn register_handler(
+/// Fan-out /list-vms to all backends and return the merged JSON array.
+async fn list_vms_handler(
     State(state): State<AppState>,
-    Json(body): Json<RegisterRequest>,
+    request: Request<Body>,
 ) -> impl IntoResponse {
-    let url = format!("http://{}:{}", body.ip, body.port);
-    tracing::info!("Backend registered: {}", url);
-    *state.backend_url.write().await = Some(url);
-    axum::http::StatusCode::OK
+    let headers = request.headers().clone();
+    let uri = request.uri().clone();
+    state.proxy_service.list_all(uri.path(), headers).await
+}
+
+#[derive(serde::Deserialize)]
+struct DeleteVmRequest {
+    id: String,
+}
+
+/// Route /delete-vm to the backend that owns the VM, identified by the ID in
+/// the request body. Returns 400 if the body is invalid JSON, 404 if the VM
+/// is not known to the registry.
+async fn delete_vm_handler(
+    State(state): State<AppState>,
+    request: Request<Body>,
+) -> impl IntoResponse {
+    let (parts, body) = request.into_parts();
+    let bytes = axum::body::to_bytes(body, usize::MAX)
+        .await
+        .unwrap_or_default();
+
+    let vm_id = match serde_json::from_slice::<DeleteVmRequest>(&bytes) {
+        Ok(req) => req.id,
+        Err(_) => return (StatusCode::BAD_REQUEST, "Invalid request body").into_response(),
+    };
+
+    let backend_url = match state.registry.read().await.backend_for_vm(&vm_id) {
+        Some(u) => u,
+        None => return (StatusCode::NOT_FOUND, "Unknown VM ID").into_response(),
+    };
+
+    state
+        .proxy_service
+        .proxy_request_to(
+            backend_url,
+            parts.method,
+            parts.uri,
+            parts.headers,
+            Some(Body::from(bytes)),
+            None,
+        )
+        .await
+        .into_response()
 }
 
 async fn proxy_handler(State(state): State<AppState>, request: Request<Body>) -> impl IntoResponse {
@@ -111,6 +186,7 @@ mod tests {
     use super::*;
     use axum::http::Request;
     use tokio::net::TcpListener;
+    use tokio::sync::Mutex;
     use tower::ServiceExt;
 
     // ── helpers ───────────────────────────────────────────────────────────────
@@ -129,15 +205,30 @@ mod tests {
         port
     }
 
-    /// Build a test app and return it alongside the shared backend-URL handle.
-    /// The Router is Clone (state uses Arc internally), so callers can
-    /// `.clone().oneshot(req)` multiple times against the same shared state.
-    fn build_test_app() -> (Router, Arc<RwLock<Option<String>>>) {
-        let backend_url: Arc<RwLock<Option<String>>> = Arc::new(RwLock::new(None));
-        let proxy_service = Arc::new(ProxyService::new(Arc::clone(&backend_url)));
+    /// Backend that counts requests and returns a fixed body.
+    async fn start_counting_backend(body: &'static str) -> (u16, Arc<Mutex<usize>>) {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let count = Arc::new(Mutex::new(0usize));
+        let c = count.clone();
+        let app = Router::new().fallback(move || {
+            let c = c.clone();
+            async move {
+                *c.lock().await += 1;
+                (axum::http::StatusCode::OK, body)
+            }
+        });
+        tokio::spawn(async move { axum::serve(listener, app).await.ok() });
+        tokio::task::yield_now().await;
+        (port, count)
+    }
+
+    fn build_test_app() -> (Router, Arc<RwLock<BackendRegistry>>) {
+        let registry: Arc<RwLock<BackendRegistry>> = Arc::new(RwLock::new(BackendRegistry::new()));
+        let proxy_service = Arc::new(ProxyService::new(Arc::clone(&registry)));
         let state = AppState {
             proxy_service,
-            backend_url: Arc::clone(&backend_url),
+            registry: Arc::clone(&registry),
         };
 
         let cors = tower_http::cors::CorsLayer::new()
@@ -146,15 +237,15 @@ mod tests {
             .allow_headers(tower_http::cors::Any);
 
         let app = Router::new()
-            .route("/register", post(register_handler))
-            .route("/launch-vm", post(proxy_handler))
-            .route("/list-vms", get(proxy_handler))
-            .route("/delete-vm", delete(proxy_handler))
+            .route("/register", post(registry::register_handler))
+            .route("/launch-vm", post(launch_vm_handler))
+            .route("/list-vms", get(list_vms_handler))
+            .route("/delete-vm", delete(delete_vm_handler))
             .fallback(proxy_handler)
             .layer(cors)
             .with_state(state);
 
-        (app, backend_url)
+        (app, registry)
     }
 
     async fn body_string(resp: axum::http::Response<Body>) -> String {
@@ -168,7 +259,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_register_sets_backend_url() {
-        let (app, backend_url) = build_test_app();
+        let (app, registry) = build_test_app();
 
         let req = Request::builder()
             .method("POST")
@@ -180,8 +271,12 @@ mod tests {
         let resp = app.oneshot(req).await.unwrap();
         assert_eq!(resp.status(), axum::http::StatusCode::OK);
 
-        let url = backend_url.read().await;
-        assert_eq!(url.as_deref(), Some("http://127.0.0.1:8081"));
+        let body = body_string(resp).await;
+        let val: serde_json::Value = serde_json::from_str(&body).unwrap();
+        assert!(val["id"].is_string());
+
+        let reg = registry.read().await;
+        assert_eq!(reg.any_url().as_deref(), Some("http://127.0.0.1:8081"));
     }
 
     // ── proxy routing ─────────────────────────────────────────────────────────
@@ -200,10 +295,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_full_proxy_flow_register_then_request() {
-        let port = start_mock_backend(200, "vm list").await;
+        // list-vms fan-out aggregates JSON arrays; mock must return a valid array.
+        let port = start_mock_backend(200, r#"[{"id":"vm1"}]"#).await;
         let (app, _) = build_test_app();
 
-        // Register backend.
         let register_req = Request::builder()
             .method("POST")
             .uri("/register")
@@ -212,7 +307,6 @@ mod tests {
             .unwrap();
         app.clone().oneshot(register_req).await.unwrap();
 
-        // Now proxy a request — should reach the mock backend.
         let proxy_req = Request::builder()
             .method("GET")
             .uri("/list-vms")
@@ -220,11 +314,16 @@ mod tests {
             .unwrap();
         let resp = app.clone().oneshot(proxy_req).await.unwrap();
         assert_eq!(resp.status(), axum::http::StatusCode::OK);
-        assert_eq!(body_string(resp).await, "vm list");
+
+        let body = body_string(resp).await;
+        let val: serde_json::Value = serde_json::from_str(&body).unwrap();
+        assert!(val.is_array());
+        assert!(!val.as_array().unwrap().is_empty());
     }
 
     #[tokio::test]
     async fn test_launch_vm_route_accepts_post() {
+        // Backend returns a 201 with a non-JSON body; the handler still proxies it.
         let port = start_mock_backend(201, "launched").await;
         let (app, _) = build_test_app();
 
@@ -255,7 +354,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_delete_vm_route_accepts_delete() {
+    async fn test_delete_vm_unknown_id_returns_404() {
         let port = start_mock_backend(200, "deleted").await;
         let (app, _) = build_test_app();
 
@@ -276,12 +375,13 @@ mod tests {
                 Request::builder()
                     .method("DELETE")
                     .uri("/delete-vm")
-                    .body(Body::empty())
+                    .header("content-type", "application/json")
+                    .body(Body::from(r#"{"id":"unknown-vm-id"}"#))
                     .unwrap(),
             )
             .await
             .unwrap();
-        assert_eq!(resp.status(), axum::http::StatusCode::OK);
+        assert_eq!(resp.status(), axum::http::StatusCode::NOT_FOUND);
     }
 
     #[tokio::test]
@@ -333,6 +433,197 @@ mod tests {
         assert!(
             resp.headers().contains_key("access-control-allow-origin"),
             "CORS allow-origin header must be present"
+        );
+    }
+
+    // ── multi-backend routing ─────────────────────────────────────────────────
+
+    #[tokio::test]
+    async fn test_launch_vm_round_robins_across_backends() {
+        let (port_a, count_a) = start_counting_backend(r#"{"instance_id":"vm-a"}"#).await;
+        let (port_b, count_b) = start_counting_backend(r#"{"instance_id":"vm-b"}"#).await;
+        let (app, _) = build_test_app();
+
+        // Register both backends.
+        for port in [port_a, port_b] {
+            app.clone()
+                .oneshot(
+                    Request::builder()
+                        .method("POST")
+                        .uri("/register")
+                        .header("content-type", "application/json")
+                        .body(Body::from(format!(r#"{{"ip":"127.0.0.1","port":{port}}}"#)))
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+        }
+
+        // Two launches should alternate across the two backends.
+        for _ in 0..2 {
+            app.clone()
+                .oneshot(
+                    Request::builder()
+                        .method("POST")
+                        .uri("/launch-vm")
+                        .header("content-type", "application/json")
+                        .body(Body::from(r#"{"name":"test"}"#))
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+        }
+
+        assert_eq!(
+            *count_a.lock().await,
+            1,
+            "backend A should receive exactly 1 launch"
+        );
+        assert_eq!(
+            *count_b.lock().await,
+            1,
+            "backend B should receive exactly 1 launch"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_list_vms_aggregates_all_backends() {
+        let port_a = start_mock_backend(200, r#"[{"id":"vm-a"}]"#).await;
+        let port_b = start_mock_backend(200, r#"[{"id":"vm-b"}]"#).await;
+        let (app, _) = build_test_app();
+
+        for port in [port_a, port_b] {
+            app.clone()
+                .oneshot(
+                    Request::builder()
+                        .method("POST")
+                        .uri("/register")
+                        .header("content-type", "application/json")
+                        .body(Body::from(format!(r#"{{"ip":"127.0.0.1","port":{port}}}"#)))
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+        }
+
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/list-vms")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(resp.status(), axum::http::StatusCode::OK);
+        let body = body_string(resp).await;
+        let val: serde_json::Value = serde_json::from_str(&body).unwrap();
+        let arr = val.as_array().unwrap();
+        assert_eq!(
+            arr.len(),
+            2,
+            "merged list should contain VMs from both backends"
+        );
+        let ids: Vec<&str> = arr.iter().filter_map(|v| v["id"].as_str()).collect();
+        assert!(ids.contains(&"vm-a"));
+        assert!(ids.contains(&"vm-b"));
+    }
+
+    #[tokio::test]
+    async fn test_delete_vm_routes_to_correct_backend() {
+        // Backend A records whether it received a DELETE; backend B does too.
+        let delete_count_a = Arc::new(Mutex::new(0usize));
+        let delete_count_b = Arc::new(Mutex::new(0usize));
+
+        // Each backend counts every request (launch + delete).
+        let dca = delete_count_a.clone();
+        let listener_da = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port_da = listener_da.local_addr().unwrap().port();
+        tokio::spawn(async move {
+            let app = Router::new().fallback(move || {
+                let dca = dca.clone();
+                async move {
+                    *dca.lock().await += 1;
+                    (axum::http::StatusCode::OK, r#"{"instance_id":"vm-a"}"#)
+                }
+            });
+            axum::serve(listener_da, app).await.ok()
+        });
+
+        let dcb = delete_count_b.clone();
+        let listener_db = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port_db = listener_db.local_addr().unwrap().port();
+        tokio::spawn(async move {
+            let app = Router::new().fallback(move || {
+                let dcb = dcb.clone();
+                async move {
+                    *dcb.lock().await += 1;
+                    (axum::http::StatusCode::OK, r#"{"instance_id":"vm-b"}"#)
+                }
+            });
+            axum::serve(listener_db, app).await.ok()
+        });
+        tokio::task::yield_now().await;
+
+        let (app, _) = build_test_app();
+
+        // Register the delete-tracking backends (they also handle launch).
+        for port in [port_da, port_db] {
+            app.clone()
+                .oneshot(
+                    Request::builder()
+                        .method("POST")
+                        .uri("/register")
+                        .header("content-type", "application/json")
+                        .body(Body::from(format!(r#"{{"ip":"127.0.0.1","port":{port}}}"#)))
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+        }
+
+        // Launch twice so vm-a maps to backend A and vm-b maps to backend B.
+        for _ in 0..2 {
+            app.clone()
+                .oneshot(
+                    Request::builder()
+                        .method("POST")
+                        .uri("/launch-vm")
+                        .header("content-type", "application/json")
+                        .body(Body::from(r#"{"name":"test"}"#))
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+        }
+
+        // Delete vm-b — should route only to backend B (port_db).
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .method("DELETE")
+                    .uri("/delete-vm")
+                    .header("content-type", "application/json")
+                    .body(Body::from(r#"{"id":"vm-b"}"#))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), axum::http::StatusCode::OK);
+
+        // Backend A must not have received an extra request for the delete.
+        assert_eq!(
+            *delete_count_a.lock().await,
+            1,
+            "backend A should have 1 hit (launch only)"
+        );
+        // Backend B received the launch AND the delete.
+        assert_eq!(
+            *delete_count_b.lock().await,
+            2,
+            "backend B should have 2 hits (launch + delete)"
         );
     }
 }

@@ -3,27 +3,30 @@ use axum::{
     extract::Query,
     http::{HeaderMap, Method, StatusCode, Uri},
     response::IntoResponse,
+    Json,
 };
 use reqwest::Client;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tracing::{error, info};
+use tracing::{error, info, warn};
+
+use crate::registry::BackendRegistry;
 
 pub struct ProxyService {
     client: Client,
-    pub backend_url: Arc<RwLock<Option<String>>>,
+    registry: Arc<RwLock<BackendRegistry>>,
 }
 
 impl ProxyService {
-    pub fn new(backend_url: Arc<RwLock<Option<String>>>) -> Self {
-        let client = Client::new();
+    pub fn new(registry: Arc<RwLock<BackendRegistry>>) -> Self {
         Self {
-            client,
-            backend_url,
+            client: Client::new(),
+            registry,
         }
     }
 
+    /// Generic proxy: picks any available backend via the registry.
     pub async fn proxy_request(
         &self,
         method: Method,
@@ -32,12 +35,10 @@ impl ProxyService {
         body: Option<Body>,
         query: Option<Query<HashMap<String, String>>>,
     ) -> impl IntoResponse {
-        let path = uri.path();
-
         let url = {
-            let guard = self.backend_url.read().await;
-            match guard.as_ref() {
-                Some(u) => u.clone(),
+            let guard = self.registry.read().await;
+            match guard.any_url() {
+                Some(u) => u,
                 None => {
                     return (
                         StatusCode::SERVICE_UNAVAILABLE,
@@ -47,11 +48,90 @@ impl ProxyService {
                 }
             }
         };
+        self.forward(url, method, uri, headers, body, query).await
+    }
 
+    /// Proxy to an explicit backend URL; returns a concrete Response so callers
+    /// can inspect the status and body before forwarding (e.g. launch_vm_handler).
+    pub async fn proxy_request_to(
+        &self,
+        backend_url: String,
+        method: Method,
+        uri: Uri,
+        headers: HeaderMap,
+        body: Option<Body>,
+        query: Option<Query<HashMap<String, String>>>,
+    ) -> axum::http::Response<Body> {
+        self.forward(backend_url, method, uri, headers, body, query)
+            .await
+    }
+
+    /// Fan-out GET to all registered backends and merge the JSON array results.
+    /// Backends that fail or return non-JSON-array responses are skipped with a warning.
+    pub async fn list_all(&self, path: &str, headers: HeaderMap) -> impl IntoResponse {
+        let urls = self.registry.read().await.all_urls();
+        if urls.is_empty() {
+            return (
+                StatusCode::SERVICE_UNAVAILABLE,
+                "Backend not yet registered",
+            )
+                .into_response();
+        }
+
+        let mut tasks = tokio::task::JoinSet::new();
+        for url in urls {
+            let client = self.client.clone();
+            let target = format!("{url}{path}");
+            let headers = headers.clone();
+            tasks.spawn(async move {
+                let mut req_builder = client.get(&target);
+                for (key, value) in headers.iter() {
+                    if key != "host" && key != "connection" {
+                        if let (Ok(name), Ok(val)) = (
+                            reqwest::header::HeaderName::from_bytes(key.as_str().as_bytes()),
+                            reqwest::header::HeaderValue::from_bytes(value.as_bytes()),
+                        ) {
+                            req_builder = req_builder.header(name, val);
+                        }
+                    }
+                }
+                req_builder.send().await
+            });
+        }
+
+        let mut merged: Vec<serde_json::Value> = Vec::new();
+        while let Some(result) = tasks.join_next().await {
+            match result {
+                Ok(Ok(resp)) => {
+                    if let Ok(items) = resp.json::<Vec<serde_json::Value>>().await {
+                        merged.extend(items);
+                    } else {
+                        warn!("Backend returned non-JSON-array response for list request");
+                    }
+                }
+                Ok(Err(e)) => warn!("Backend request failed: {}", e),
+                Err(e) => warn!("Fan-out task panicked: {}", e),
+            }
+        }
+
+        Json(merged).into_response()
+    }
+
+    /// Shared forwarding logic used by both `proxy_request` and `proxy_request_to`.
+    async fn forward(
+        &self,
+        url: String,
+        method: Method,
+        uri: Uri,
+        headers: HeaderMap,
+        body: Option<Body>,
+        query: Option<Query<HashMap<String, String>>>,
+    ) -> axum::http::Response<Body> {
+        let path = uri.path();
         let backend_url = format!("{url}{path}");
         info!("Proxying {} {} -> {}", method, path, backend_url);
 
-        // Convert Axum Method to Reqwest Method
+        // Convert Axum Method to Reqwest Method.
         let reqwest_method = match method.as_str() {
             "GET" => reqwest::Method::GET,
             "POST" => reqwest::Method::POST,
@@ -60,16 +140,14 @@ impl ProxyService {
             "PATCH" => reqwest::Method::PATCH,
             "HEAD" => reqwest::Method::HEAD,
             "OPTIONS" => reqwest::Method::OPTIONS,
-            _ => reqwest::Method::GET, // Default fallback
+            _ => reqwest::Method::GET,
         };
 
-        // Build the request
         let mut request_builder = self.client.request(reqwest_method, &backend_url);
 
-        // Add headers (excluding host and connection headers)
+        // Forward headers, excluding hop-by-hop headers.
         for (key, value) in headers.iter() {
             if key != "host" && key != "connection" {
-                // Convert Axum header types to Reqwest header types
                 if let (Ok(name), Ok(val)) = (
                     reqwest::header::HeaderName::from_bytes(key.as_str().as_bytes()),
                     reqwest::header::HeaderValue::from_bytes(value.as_bytes()),
@@ -79,14 +157,11 @@ impl ProxyService {
             }
         }
 
-        // Add query parameters if present
         if let Some(query) = query {
             request_builder = request_builder.query(&query.0);
         }
 
-        // Add body for POST/PUT/PATCH requests
         let request = if let Some(body) = body {
-            // Convert Axum Body to bytes first
             let body_bytes = match axum::body::to_bytes(body, usize::MAX).await {
                 Ok(bytes) => bytes,
                 Err(e) => {
@@ -95,34 +170,29 @@ impl ProxyService {
                         .into_response();
                 }
             };
-
-            // Convert to Reqwest Body
-            let reqwest_body = reqwest::Body::from(body_bytes);
-            request_builder.body(reqwest_body).build().unwrap()
+            request_builder
+                .body(reqwest::Body::from(body_bytes))
+                .build()
+                .unwrap()
         } else {
             request_builder.build().unwrap()
         };
 
-        // Execute the request
         match self.client.execute(request).await {
             Ok(response) => {
                 let status = response.status();
-                let headers = response.headers().clone();
+                let resp_headers = response.headers().clone();
                 let body_bytes = response.bytes().await.unwrap_or_default();
-
                 info!("Backend response: {}", status);
 
-                // Convert Reqwest status to Axum status
                 let axum_status = StatusCode::from_u16(status.as_u16())
                     .unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
 
-                // Convert response back to axum response
                 let mut response_builder = axum::http::Response::builder().status(axum_status);
 
-                // Copy headers from backend response
-                for (key, value) in headers.iter() {
+                for (key, value) in resp_headers.iter() {
+                    // transfer-encoding is a hop-by-hop header; strip it.
                     if key != "transfer-encoding" {
-                        // Convert Reqwest header types to Axum header types
                         if let (Ok(name), Ok(val)) = (
                             axum::http::HeaderName::from_bytes(key.as_str().as_bytes()),
                             axum::http::HeaderValue::from_bytes(value.as_bytes()),
@@ -132,10 +202,7 @@ impl ProxyService {
                     }
                 }
 
-                response_builder
-                    .body(Body::from(body_bytes))
-                    .unwrap()
-                    .into_response()
+                response_builder.body(Body::from(body_bytes)).unwrap()
             }
             Err(e) => {
                 error!("Proxy request failed: {}", e);
@@ -152,6 +219,7 @@ impl ProxyService {
 #[cfg(test)]
 mod tests {
     use super::ProxyService;
+    use crate::registry::BackendRegistry;
     use axum::{
         body::Body,
         extract::Query,
@@ -166,7 +234,6 @@ mod tests {
 
     // ── helpers ──────────────────────────────────────────────────────────────
 
-    /// Spin up a mock backend that replies with a fixed status + body for every request.
     async fn start_mock_backend(status: u16, body: &'static str) -> u16 {
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let port = listener.local_addr().unwrap().port();
@@ -178,7 +245,6 @@ mod tests {
         port
     }
 
-    /// Spin up a mock backend that echoes the request body back in the response.
     async fn start_body_echo_backend() -> u16 {
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let port = listener.local_addr().unwrap().port();
@@ -188,7 +254,6 @@ mod tests {
         port
     }
 
-    /// Spin up a mock backend that echoes the request path back in the response.
     async fn start_path_echo_backend() -> u16 {
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let port = listener.local_addr().unwrap().port();
@@ -198,7 +263,6 @@ mod tests {
         port
     }
 
-    /// Spin up a mock backend that stores every incoming header in the returned Arc.
     async fn start_header_capture_backend() -> (u16, Arc<Mutex<Vec<(String, String)>>>) {
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let port = listener.local_addr().unwrap().port();
@@ -220,7 +284,11 @@ mod tests {
     }
 
     fn make_service(backend_url: Option<String>) -> ProxyService {
-        ProxyService::new(Arc::new(RwLock::new(backend_url)))
+        let registry = match backend_url {
+            Some(url) => BackendRegistry::with_url(url),
+            None => BackendRegistry::new(),
+        };
+        ProxyService::new(Arc::new(RwLock::new(registry)))
     }
 
     fn service_for_port(port: u16) -> ProxyService {
@@ -455,7 +523,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_query_params_forwarded_when_provided() {
-        // Query params passed via the Query argument are added to the backend URL.
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let port = listener.local_addr().unwrap().port();
         let app =
@@ -506,8 +573,6 @@ mod tests {
             .into_response();
 
         let captured = captured.lock().await;
-        // Reqwest will add its own host header pointing at the backend, but the
-        // original proxy hostname must not appear.
         let has_proxy_host = captured
             .iter()
             .any(|(k, v)| k == "host" && v == "proxy.example.com");
@@ -667,8 +732,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_backend_url_updated_dynamically() {
-        let backend_url: Arc<RwLock<Option<String>>> = Arc::new(RwLock::new(None));
-        let svc = ProxyService::new(Arc::clone(&backend_url));
+        let registry: Arc<RwLock<BackendRegistry>> = Arc::new(RwLock::new(BackendRegistry::new()));
+        let svc = ProxyService::new(Arc::clone(&registry));
 
         // Before registration the proxy must refuse requests.
         let resp = svc
@@ -685,7 +750,7 @@ mod tests {
 
         // Simulate backend registering itself.
         let port = start_mock_backend(200, "registered").await;
-        *backend_url.write().await = Some(format!("http://127.0.0.1:{port}"));
+        registry.write().await.register("127.0.0.1", port);
 
         let resp = svc
             .proxy_request(
