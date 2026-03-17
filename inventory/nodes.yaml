@@ -11,6 +11,7 @@ all:
     workers:
       hosts:
         pc1:
+        pc2:
     controller:
       hosts:
         pc1:

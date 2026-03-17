@@ -57,9 +57,10 @@ async fn main() {
         .layer(cors)
         .with_state(state);
 
-    let listener = tokio::net::TcpListener::bind(format!("127.0.0.1:{}", config.proxy_port))
-        .await
-        .unwrap();
+    let listener =
+        tokio::net::TcpListener::bind(format!("{}:{}", config.listen_ip, config.proxy_port))
+            .await
+            .unwrap();
 
     tracing::info!(
         "Proxy server listening on {}",

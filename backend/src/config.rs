@@ -9,6 +9,7 @@ pub struct StorageConfig {
 
 #[derive(Debug, Deserialize)]
 pub struct Config {
+    pub listen_ip: String,
     pub listen_port: u16,
     pub proxy_url: String,
     pub storage: StorageConfig,
@@ -28,6 +29,7 @@ impl Config {
         };
 
         let config = config::Config::builder()
+            .set_default("listen_ip", "127.0.0.1")?
             .set_default("listen_port", 8081)?
             .add_source(config::File::with_name(&config_file))
             .build()?;

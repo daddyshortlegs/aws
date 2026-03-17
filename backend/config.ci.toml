@@ -1,3 +1,4 @@
+listen_ip = "127.0.0.1"
 proxy_url = "http://127.0.0.1:8080"
 
 [storage]

@@ -34,6 +34,7 @@
          Restart=always
          RestartSec=10
          Environment="RUST_LOG=info"
+         Environment="LISTEN_IP=0.0.0.0"
 
          [Install]
          WantedBy=multi-user.target

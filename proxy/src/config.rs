@@ -2,12 +2,14 @@ use std::env;
 
 #[derive(Debug, Clone)]
 pub struct Config {
+    pub listen_ip: String,
     pub proxy_port: u16,
     pub log_level: String,
 }
 
 impl Config {
     pub fn load() -> Result<Self, Box<dyn std::error::Error>> {
+        let listen_ip = env::var("LISTEN_IP").unwrap_or_else(|_| "127.0.0.1".to_string());
         let proxy_port = env::var("PROXY_PORT")
             .unwrap_or_else(|_| "8080".to_string())
             .parse()
@@ -15,6 +17,7 @@ impl Config {
         let log_level = env::var("RUST_LOG").unwrap_or_else(|_| "info".into());
 
         Ok(Config {
+            listen_ip,
             proxy_port,
             log_level,
         })

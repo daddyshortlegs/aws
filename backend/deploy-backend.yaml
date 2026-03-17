@@ -22,6 +22,8 @@
    - name: Create config file
      ansible.builtin.copy:
        content: |
+         listen_ip = "{{ ansible_host }}"
+         proxy_url = "http://10.0.0.1:8080"
          [storage]
          qcow2_dir = "{{ aws_base_path }}/vm-data"
          metadata_dir = "{{ aws_base_path }}/vm-data"
