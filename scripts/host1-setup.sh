@@ -7,7 +7,7 @@ set -euo pipefail
 # Packages
 # ---------------------------------------------------------------------------
 
-apt-get install -y bridge-utils
+apt-get install -y bridge-utils dnsmasq
 
 # ---------------------------------------------------------------------------
 # Network interfaces
@@ -111,6 +111,22 @@ else
 fi
 EOF
 chmod +x /etc/qemu-ifdown
+
+# ---------------------------------------------------------------------------
+# DHCP server for VMs (dnsmasq)
+# Hands out IPs in 10.0.0.100–200; leaves .1–.3 free for physical hosts.
+# ---------------------------------------------------------------------------
+
+cat > /etc/dnsmasq.conf << 'EOF'
+interface=br0
+listen-address=10.0.0.1
+bind-interfaces
+dhcp-range=10.0.0.100,10.0.0.200,12h
+dhcp-option=option:router,10.0.0.1
+dhcp-option=option:dns-server,8.8.8.8,8.8.4.4
+EOF
+
+systemctl enable --now dnsmasq
 
 # ---------------------------------------------------------------------------
 # Apply network configuration
