@@ -1,6 +1,13 @@
 - name: Setup nodes
   hosts: workers
   tasks:
+   - name: Install qemu
+     ansible.builtin.apt:
+       name: qemu-system-x86
+       state: present
+       update_cache: yes
+     become: yes
+
    - name: Create aws directory
      ansible.builtin.file:
        path: "{{ item }}"
