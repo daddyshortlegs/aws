@@ -128,6 +128,15 @@ EOF
 
 systemctl enable --now dnsmasq
 
+# Ensure dnsmasq starts after br0 is up (avoids bind failure on reboot)
+mkdir -p /etc/systemd/system/dnsmasq.service.d
+cat > /etc/systemd/system/dnsmasq.service.d/wait-for-bridge.conf << 'EOF'
+[Unit]
+After=network-online.target
+Wants=network-online.target
+EOF
+systemctl daemon-reload
+
 # ---------------------------------------------------------------------------
 # Apply network configuration
 # ---------------------------------------------------------------------------
