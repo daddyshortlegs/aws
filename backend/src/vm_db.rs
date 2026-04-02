@@ -7,7 +7,10 @@ use tracing::debug;
 pub struct VmInfo {
     pub id: String,
     pub name: String,
-    pub ssh_port: u16,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ssh_port: Option<u16>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub mac_address: Option<String>,
     pub pid: u32,
 }
 
@@ -82,7 +85,8 @@ mod tests {
         VmInfo {
             id: id.to_string(),
             name: name.to_string(),
-            ssh_port: 2222,
+            ssh_port: Some(2222),
+            mac_address: None,
             pid: 1234,
         }
     }
@@ -97,7 +101,7 @@ mod tests {
         let retrieved = get_vm_by_id(dir.path(), "test-1").unwrap().unwrap();
         assert_eq!(retrieved.id, vm.id);
         assert_eq!(retrieved.name, vm.name);
-        assert_eq!(retrieved.ssh_port, vm.ssh_port);
+        assert_eq!(retrieved.ssh_port, Some(2222));
         assert_eq!(retrieved.pid, vm.pid);
     }
 

@@ -78,10 +78,9 @@ const VMList: React.FC<VMListProps> = ({ refreshKey = 0 }) => {
     }
   };
 
-  const handleConnect = (vmName: string, sshPort: number) => {
-    // Open SSH terminal in a new tab
-    const terminalUrl = `/terminal?vm=${encodeURIComponent(vmName)}&port=${sshPort}`;
-    window.open(terminalUrl, `terminal-${vmName}-${sshPort}`, 'width=1200,height=800,scrollbars=yes,resizable=yes');
+  const handleConnect = (vmName: string, sshHost: string, sshPort: number) => {
+    const terminalUrl = `/terminal?vm=${encodeURIComponent(vmName)}&host=${encodeURIComponent(sshHost)}&port=${sshPort}`;
+    window.open(terminalUrl, `terminal-${vmName}`, 'width=1200,height=800,scrollbars=yes,resizable=yes');
   };
 
   const getStatusBadgeClass = (pid: number) => {
@@ -133,7 +132,7 @@ const VMList: React.FC<VMListProps> = ({ refreshKey = 0 }) => {
                   <tr>
                     <th>Name</th>
                     <th>Status</th>
-                    <th>SSH Port</th>
+                    <th>SSH Access</th>
                     <th>PID</th>
                     <th>Actions</th>
                   </tr>
@@ -152,7 +151,7 @@ const VMList: React.FC<VMListProps> = ({ refreshKey = 0 }) => {
                         </span>
                       </td>
                       <td>
-                        <code>{vm.ssh_port}</code>
+                        <code>{vm.ssh_host ? `${vm.ssh_host}:${vm.ssh_port}` : 'Waiting for IP...'}</code>
                       </td>
                       <td>
                         <code>{vm.pid}</code>
@@ -161,8 +160,9 @@ const VMList: React.FC<VMListProps> = ({ refreshKey = 0 }) => {
                         <div className="btn-group" role="group">
                           <button
                             className="btn btn-outline-primary btn-sm"
-                            onClick={() => handleConnect(vm.name, vm.ssh_port)}
-                            title={`Open SSH terminal for ${vm.name} in new tab`}
+                            onClick={() => handleConnect(vm.name, vm.ssh_host, vm.ssh_port)}
+                            disabled={!vm.ssh_host}
+                            title={vm.ssh_host ? `Open SSH terminal for ${vm.name} in new tab` : 'Waiting for IP address...'}
                           >
                             <i className="bi bi-terminal"></i> Connect
                           </button>

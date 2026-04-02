@@ -5,18 +5,20 @@ import StandaloneTerminal from '../components/StandaloneTerminal';
 const TerminalPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const [vmName, setVmName] = useState<string>('');
+  const [sshHost, setSshHost] = useState<string>('');
   const [sshPort, setSshPort] = useState<number>(0);
   const [isValid, setIsValid] = useState<boolean>(false);
 
   useEffect(() => {
-    // Extract parameters from URL
     const vm = searchParams.get('vm');
+    const host = searchParams.get('host');
     const port = searchParams.get('port');
 
-    if (vm && port) {
+    if (vm && host && port) {
       const portNum = parseInt(port, 10);
       if (portNum > 0) {
         setVmName(vm);
+        setSshHost(host);
         setSshPort(portNum);
         setIsValid(true);
       } else {
@@ -60,10 +62,10 @@ const TerminalPage: React.FC = () => {
             textAlign: 'left'
           }}>
             <div>Required format:</div>
-            <div>/terminal?vm=VM_NAME&port=SSH_PORT</div>
+            <div>/terminal?vm=VM_NAME&host=SSH_HOST&port=SSH_PORT</div>
             <br />
             <div>Example:</div>
-            <div>/terminal?vm=my-vm&port=22</div>
+            <div>/terminal?vm=my-vm&host=localhost&port=54321</div>
           </div>
           <button
             onClick={() => window.close()}
@@ -84,7 +86,7 @@ const TerminalPage: React.FC = () => {
     );
   }
 
-  return <StandaloneTerminal vmName={vmName} sshPort={sshPort} />;
+  return <StandaloneTerminal vmName={vmName} sshHost={sshHost} sshPort={sshPort} />;
 };
 
 export default TerminalPage;

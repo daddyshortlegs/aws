@@ -3,13 +3,15 @@ import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
 import '@xterm/xterm/css/xterm.css';
+import { config } from '../config';
 
 interface StandaloneTerminalProps {
   vmName: string;
+  sshHost: string;
   sshPort: number;
 }
 
-const StandaloneTerminal: React.FC<StandaloneTerminalProps> = ({ vmName, sshPort }) => {
+const StandaloneTerminal: React.FC<StandaloneTerminalProps> = ({ vmName, sshHost, sshPort }) => {
   const terminalRef = useRef<HTMLDivElement>(null);
   const terminalInstance = useRef<Terminal | null>(null);
   const [isConnected, setIsConnected] = useState(false);
@@ -51,13 +53,12 @@ const StandaloneTerminal: React.FC<StandaloneTerminalProps> = ({ vmName, sshPort
     };
     window.addEventListener('resize', handleResize);
 
-    // Create WebSocket connection with dynamic port
-    const socket = new WebSocket(`ws://localhost:3001?port=${sshPort}`);
+    const socket = new WebSocket(`${config.getSshWsUrl()}?host=${encodeURIComponent(sshHost)}&port=${sshPort}`);
 
     socket.onopen = () => {
       setIsConnected(true);
       setConnectionError(null);
-      terminal.writeln(`\r\n\x1b[32m✓ Connected to ${vmName} on port ${sshPort}\x1b[0m`);
+      terminal.writeln(`\r\n\x1b[32m✓ Connected to ${vmName} at ${sshHost}:${sshPort}\x1b[0m`);
       terminal.writeln('\r\n');
     };
 
@@ -88,7 +89,7 @@ const StandaloneTerminal: React.FC<StandaloneTerminalProps> = ({ vmName, sshPort
       socket.close();
       terminal.dispose();
     };
-  }, [vmName, sshPort]);
+  }, [vmName, sshHost, sshPort]);
 
   const handleClose = () => {
     window.close();
@@ -108,7 +109,7 @@ const StandaloneTerminal: React.FC<StandaloneTerminalProps> = ({ vmName, sshPort
       }}>
         <div className="terminal-title">
           <i className="bi bi-terminal" style={{ marginRight: '8px' }}></i>
-          SSH Terminal - {vmName} (Port: {sshPort})
+          SSH Terminal - {vmName} ({sshHost}:{sshPort})
         </div>
         <div className="terminal-controls">
           <span className={`connection-status ${isConnected ? 'connected' : 'disconnected'}`} style={{

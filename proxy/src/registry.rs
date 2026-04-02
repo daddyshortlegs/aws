@@ -22,14 +22,20 @@ impl BackendRegistry {
     }
 
     /// Register a backend and return its assigned UUID.
+    /// If the same ip:port is already registered, returns the existing UUID
+    /// without adding a duplicate entry.
     pub fn register(&mut self, ip: &str, port: u16) -> Uuid {
+        let url = format!("http://{ip}:{port}");
+        if let Some(id) = self
+            .order
+            .iter()
+            .find(|id| self.backends.get(id).is_some_and(|e| e.url == url))
+        {
+            return *id;
+        }
+
         let id = Uuid::new_v4();
-        self.backends.insert(
-            id,
-            BackendEntry {
-                url: format!("http://{ip}:{port}"),
-            },
-        );
+        self.backends.insert(id, BackendEntry { url });
         self.order.push(id);
         id
     }
@@ -109,6 +115,16 @@ mod tests {
         let id_a = reg.register("127.0.0.1", 8081);
         let id_b = reg.register("127.0.0.1", 8082);
         assert_ne!(id_a, id_b);
+    }
+
+    #[test]
+    fn test_register_same_url_returns_existing_id() {
+        let mut reg = BackendRegistry::new();
+        let id_first = reg.register("10.0.0.1", 8081);
+        let id_second = reg.register("10.0.0.1", 8081);
+        assert_eq!(id_first, id_second);
+        // Must not create a duplicate entry in all_urls.
+        assert_eq!(reg.all_urls().len(), 1);
     }
 
     #[test]

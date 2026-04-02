@@ -12,6 +12,7 @@ all:
       hosts:
         pc1:
         pc2:
+        pc3:
     controller:
       hosts:
         pc1:
