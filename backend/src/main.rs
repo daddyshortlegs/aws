@@ -10,7 +10,10 @@ mod qemu;
 mod register;
 mod vm_db;
 mod vm_service;
+mod volume_db;
+mod volume_service;
 use vm_service::{delete_vm_handler, launch_vm, list_vms_handler, start_all_vms};
+use volume_service::{delete_volume_handler, launch_volume, list_volumes_handler};
 
 #[tokio::main]
 async fn main() {
@@ -34,6 +37,9 @@ async fn main() {
         .route("/launch-vm", post(launch_vm))
         .route("/list-vms", get(list_vms_handler))
         .route("/delete-vm", delete(delete_vm_handler))
+        .route("/launch-volume", post(launch_volume))
+        .route("/list-volumes", get(list_volumes_handler))
+        .route("/delete-volume", delete(delete_volume_handler))
         .layer(cors);
 
     start_all_vms().await;

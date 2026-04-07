@@ -5,6 +5,7 @@ use std::path::PathBuf;
 pub struct StorageConfig {
     pub qcow2_dir: PathBuf,
     pub metadata_dir: PathBuf,
+    pub volume_data_dir: PathBuf,
 }
 
 #[derive(Debug, Default, Deserialize, PartialEq, Clone)]

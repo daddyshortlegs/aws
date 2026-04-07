@@ -5,3 +5,4 @@ proxy_url = "http://127.0.0.1:8080"
 [storage]
 qcow2_dir = "/Users/asmith/home-git/aws/vm-data"
 metadata_dir = "/Users/asmith/home-git/aws/vm-data"
+volume_data_dir = "/Users/asmith/home-git/aws/volume-data"
