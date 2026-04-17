@@ -13,7 +13,9 @@ mod vm_service;
 mod volume_db;
 mod volume_service;
 use vm_service::{delete_vm_handler, launch_vm, list_vms_handler, start_all_vms};
-use volume_service::{delete_volume_handler, launch_volume, list_volumes_handler};
+use volume_service::{
+    delete_volume_handler, launch_volume, list_volume_files_handler, list_volumes_handler,
+};
 
 #[tokio::main]
 async fn main() {
@@ -40,6 +42,7 @@ async fn main() {
         .route("/launch-volume", post(launch_volume))
         .route("/list-volumes", get(list_volumes_handler))
         .route("/delete-volume", delete(delete_volume_handler))
+        .route("/volume-files/:id", get(list_volume_files_handler))
         .layer(cors);
 
     start_all_vms().await;

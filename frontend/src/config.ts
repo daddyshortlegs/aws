@@ -35,6 +35,9 @@ export const config = {
     launchVM: '/launch-vm',
     listVMs: '/list-vms',
     deleteVM: '/delete-vm',
+    launchVolume: '/launch-volume',
+    listVolumes: '/list-volumes',
+    deleteVolume: '/delete-volume',
     websocket: '/ws',
   },
 } as const;

@@ -9,3 +9,10 @@ export interface VM {
 export interface VMListResponse {
   vms: VM[];
 }
+
+export interface Volume {
+  id: string;
+  name: string;
+  mount_path: string;
+  loop_device?: string;
+}
