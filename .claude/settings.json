@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "agent",
+            "statusMessage": "Running linter...",
+            "timeout": 60,
+            "prompt": "A file was just written or edited. The hook input JSON is: $ARGUMENTS\n\nYour job: run linting checks on the affected file and report results.\n\n1. Extract tool_input.file_path from the JSON.\n2. Determine the component based on the path:\n   - Path contains '/backend/' and ends in .rs → Rust, crate at /Users/asmith/home-git/aws/backend\n   - Path contains '/proxy/' and ends in .rs → Rust, crate at /Users/asmith/home-git/aws/proxy\n   - Path contains '/frontend/src/' and ends in .ts, .tsx, or .js → TypeScript/JS, project at /Users/asmith/home-git/aws/frontend\n   - Path contains '/terraform_provider/' and ends in .go → Go, module at /Users/asmith/home-git/aws/terraform_provider\n   - Anything else → output 'No linting needed for this file type.' and stop.\n3. Run the checks:\n   - Rust: `cd <crate_dir> && cargo fmt --check && cargo clippy -- -D warnings`\n   - TypeScript/JS: `cd /Users/asmith/home-git/aws/frontend && npx eslint --max-warnings=0 <file_path>`\n   - Go: `cd /Users/asmith/home-git/aws/terraform_provider && gofmt -l . && go vet ./...`\n4. Report PASS or FAIL clearly, including any error output on failure."
+          }
+        ]
+      }
+    ]
+  }
+}
