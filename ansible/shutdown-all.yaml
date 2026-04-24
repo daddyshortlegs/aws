@@ -1,0 +1,8 @@
+- name: Shut down all PCs
+  become: yes
+  hosts: cluster
+  tasks:
+    - name: Shut down the host
+      ansible.builtin.command: shutdown -h now
+      async: 1
+      poll: 0
