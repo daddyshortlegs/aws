@@ -4,6 +4,7 @@ export interface VM {
   ssh_host: string;
   ssh_port: number;
   pid: number;
+  running?: boolean;
 }
 
 export interface VMListResponse {

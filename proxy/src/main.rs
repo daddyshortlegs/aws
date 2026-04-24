@@ -60,9 +60,25 @@ struct VmListEntry {
     ssh_host: String,
     ssh_port: u16,
     pid: u32,
+    /// Whether the QEMU process is currently alive on the worker.
+    running: bool,
     /// MAC address of the VM's network interface. Present in bridge mode only.
     #[serde(skip_serializing_if = "Option::is_none")]
     mac_address: Option<String>,
+}
+
+/// Request body for gracefully stopping a running VM.
+#[derive(serde::Deserialize, utoipa::ToSchema)]
+struct StopVmRequest {
+    /// UUID of the VM to stop.
+    id: String,
+}
+
+/// Request body for starting (resuming) a stopped VM.
+#[derive(serde::Deserialize, utoipa::ToSchema)]
+struct StartVmRequest {
+    /// UUID of the VM to start.
+    id: String,
 }
 
 /// Request body for creating a new volume.
@@ -327,6 +343,100 @@ async fn list_volume_files_handler(
         .into_response()
 }
 
+#[utoipa::path(
+    post,
+    path = "/stop-vm",
+    request_body = StopVmRequest,
+    responses(
+        (status = 200, description = "ACPI shutdown signal sent; VM is powering off"),
+        (status = 400, description = "Invalid request body"),
+        (status = 404, description = "VM ID not known to this proxy"),
+        (status = 409, description = "VM is not currently running"),
+    ),
+    tag = "vms"
+)]
+/// Route /stop-vm to the backend that owns the VM. The backend sends
+/// `system_powerdown` via the QEMU monitor for a graceful ACPI shutdown.
+async fn stop_vm_handler(
+    State(state): State<AppState>,
+    request: Request<Body>,
+) -> impl IntoResponse {
+    let (parts, body) = request.into_parts();
+    let bytes = axum::body::to_bytes(body, usize::MAX)
+        .await
+        .unwrap_or_default();
+
+    let vm_id = match serde_json::from_slice::<StopVmRequest>(&bytes) {
+        Ok(req) => req.id,
+        Err(_) => return (StatusCode::BAD_REQUEST, "Invalid request body").into_response(),
+    };
+
+    let backend_url = match state.registry.read().await.backend_for_vm(&vm_id) {
+        Some(u) => u,
+        None => return (StatusCode::NOT_FOUND, "Unknown VM ID").into_response(),
+    };
+
+    state
+        .proxy_service
+        .proxy_request_to(
+            backend_url,
+            parts.method,
+            parts.uri,
+            parts.headers,
+            Some(Body::from(bytes)),
+            None,
+        )
+        .await
+        .into_response()
+}
+
+#[utoipa::path(
+    post,
+    path = "/start-vm",
+    request_body = StartVmRequest,
+    responses(
+        (status = 200, description = "VM re-launched from its existing disk image"),
+        (status = 400, description = "Invalid request body"),
+        (status = 404, description = "VM ID not known to this proxy"),
+        (status = 409, description = "VM is already running"),
+    ),
+    tag = "vms"
+)]
+/// Route /start-vm to the backend that owns the VM. The backend re-launches
+/// the QEMU process from the existing qcow2 image.
+async fn start_vm_handler(
+    State(state): State<AppState>,
+    request: Request<Body>,
+) -> impl IntoResponse {
+    let (parts, body) = request.into_parts();
+    let bytes = axum::body::to_bytes(body, usize::MAX)
+        .await
+        .unwrap_or_default();
+
+    let vm_id = match serde_json::from_slice::<StartVmRequest>(&bytes) {
+        Ok(req) => req.id,
+        Err(_) => return (StatusCode::BAD_REQUEST, "Invalid request body").into_response(),
+    };
+
+    let backend_url = match state.registry.read().await.backend_for_vm(&vm_id) {
+        Some(u) => u,
+        None => return (StatusCode::NOT_FOUND, "Unknown VM ID").into_response(),
+    };
+
+    state
+        .proxy_service
+        .proxy_request_to(
+            backend_url,
+            parts.method,
+            parts.uri,
+            parts.headers,
+            Some(Body::from(bytes)),
+            None,
+        )
+        .await
+        .into_response()
+}
+
 #[derive(OpenApi)]
 #[openapi(
     paths(
@@ -334,6 +444,8 @@ async fn list_volume_files_handler(
         launch_vm_handler,
         list_vms_handler,
         delete_vm_handler,
+        stop_vm_handler,
+        start_vm_handler,
         launch_volume_handler,
         list_volumes_handler,
         delete_volume_handler,
@@ -346,6 +458,8 @@ async fn list_volume_files_handler(
         LaunchVmResponse,
         VmListEntry,
         DeleteVmRequest,
+        StopVmRequest,
+        StartVmRequest,
         LaunchVolumeRequest,
         LaunchVolumeResponse,
         VolumeInfo,
@@ -427,6 +541,8 @@ async fn main() {
         .route("/launch-vm", post(launch_vm_handler))
         .route("/list-vms", get(list_vms_handler))
         .route("/delete-vm", delete(delete_vm_handler))
+        .route("/stop-vm", post(stop_vm_handler))
+        .route("/start-vm", post(start_vm_handler))
         .route("/launch-volume", post(launch_volume_handler))
         .route("/list-volumes", get(list_volumes_handler))
         .route("/delete-volume", delete(delete_volume_handler))
@@ -682,6 +798,8 @@ mod tests {
             .route("/launch-vm", post(launch_vm_handler))
             .route("/list-vms", get(list_vms_handler))
             .route("/delete-vm", delete(delete_vm_handler))
+            .route("/stop-vm", post(stop_vm_handler))
+            .route("/start-vm", post(start_vm_handler))
             .route("/launch-volume", post(launch_volume_handler))
             .route("/list-volumes", get(list_volumes_handler))
             .route("/delete-volume", delete(delete_volume_handler))
@@ -1449,5 +1567,95 @@ mod tests {
         let body = body_string(resp).await;
         let arr: serde_json::Value = serde_json::from_str(&body).unwrap();
         assert_eq!(arr.as_array().unwrap().len(), 1);
+    }
+
+    // ── stop/start vm handlers ────────────────────────────────────────────────
+
+    #[tokio::test]
+    async fn test_stop_vm_unknown_id_returns_404() {
+        let (app, _) = build_test_app();
+
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/stop-vm")
+                    .header("content-type", "application/json")
+                    .body(Body::from(r#"{"id":"no-such-vm"}"#))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+    }
+
+    #[tokio::test]
+    async fn test_stop_vm_routes_to_owning_backend() {
+        let port = start_mock_backend(200, "stopped").await;
+        let (app, registry) = build_test_app();
+
+        registry
+            .write()
+            .await
+            .register_vm("vm-to-stop".to_string(), format!("http://127.0.0.1:{port}"));
+
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/stop-vm")
+                    .header("content-type", "application/json")
+                    .body(Body::from(r#"{"id":"vm-to-stop"}"#))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(resp.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn test_start_vm_unknown_id_returns_404() {
+        let (app, _) = build_test_app();
+
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/start-vm")
+                    .header("content-type", "application/json")
+                    .body(Body::from(r#"{"id":"no-such-vm"}"#))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+    }
+
+    #[tokio::test]
+    async fn test_start_vm_routes_to_owning_backend() {
+        let port = start_mock_backend(200, "started").await;
+        let (app, registry) = build_test_app();
+
+        registry.write().await.register_vm(
+            "vm-to-start".to_string(),
+            format!("http://127.0.0.1:{port}"),
+        );
+
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/start-vm")
+                    .header("content-type", "application/json")
+                    .body(Body::from(r#"{"id":"vm-to-start"}"#))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(resp.status(), StatusCode::OK);
     }
 }

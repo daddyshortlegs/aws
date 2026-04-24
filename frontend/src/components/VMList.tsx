@@ -11,6 +11,8 @@ const VMList: React.FC<VMListProps> = ({ refreshKey = 0 }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [deletingVM, setDeletingVM] = useState<string | null>(null);
+  const [stoppingVM, setStoppingVM] = useState<string | null>(null);
+  const [startingVM, setStartingVM] = useState<string | null>(null);
 
   useEffect(() => {
     fetchVMs();
@@ -56,19 +58,13 @@ const VMList: React.FC<VMListProps> = ({ refreshKey = 0 }) => {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          id: vmId,
-        }),
+        body: JSON.stringify({ id: vmId }),
       });
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      const result = await response.text();
-      console.log('Delete result:', result);
-
-      // Refresh the VM list after successful deletion
       await fetchVMs();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete VM');
@@ -78,15 +74,61 @@ const VMList: React.FC<VMListProps> = ({ refreshKey = 0 }) => {
     }
   };
 
+  const stopVM = async (vmId: string) => {
+    try {
+      setStoppingVM(vmId);
+      setError(null);
+
+      const response = await fetch(getApiUrl('stopVM'), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ id: vmId }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      await fetchVMs();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to stop VM');
+      console.error('Error stopping VM:', err);
+    } finally {
+      setStoppingVM(null);
+    }
+  };
+
+  const startVM = async (vmId: string) => {
+    try {
+      setStartingVM(vmId);
+      setError(null);
+
+      const response = await fetch(getApiUrl('startVM'), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ id: vmId }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      await fetchVMs();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to start VM');
+      console.error('Error starting VM:', err);
+    } finally {
+      setStartingVM(null);
+    }
+  };
+
   const handleConnect = (vmName: string, sshHost: string, sshPort: number) => {
     const terminalUrl = `/terminal?vm=${encodeURIComponent(vmName)}&host=${encodeURIComponent(sshHost)}&port=${sshPort}`;
     window.open(terminalUrl, `terminal-${vmName}`, 'width=1200,height=800,scrollbars=yes,resizable=yes');
-  };
-
-  const getStatusBadgeClass = (pid: number) => {
-    // For now, we'll assume if PID exists, the VM is running
-    // In a real implementation, you'd check if the process is actually running
-    return 'bg-success';
   };
 
   if (loading) {
@@ -138,55 +180,86 @@ const VMList: React.FC<VMListProps> = ({ refreshKey = 0 }) => {
                   </tr>
                 </thead>
                 <tbody>
-                  {vms.map((vm) => (
-                    <tr key={vm.id}>
-                      <td>
-                        <strong>{vm.name}</strong>
-                        <br />
-                        <small className="text-muted">ID: {vm.id}</small>
-                      </td>
-                      <td>
-                        <span className={`badge ${getStatusBadgeClass(vm.pid)}`}>
-                          Running
-                        </span>
-                      </td>
-                      <td>
-                        <code>{vm.ssh_host ? `${vm.ssh_host}:${vm.ssh_port}` : 'Waiting for IP...'}</code>
-                      </td>
-                      <td>
-                        <code>{vm.pid}</code>
-                      </td>
-                      <td>
-                        <div className="btn-group" role="group">
-                          <button
-                            className="btn btn-outline-primary btn-sm"
-                            onClick={() => handleConnect(vm.name, vm.ssh_host, vm.ssh_port)}
-                            disabled={!vm.ssh_host}
-                            title={vm.ssh_host ? `Open SSH terminal for ${vm.name} in new tab` : 'Waiting for IP address...'}
-                          >
-                            <i className="bi bi-terminal"></i> Connect
-                          </button>
-                          <button className="btn btn-outline-warning btn-sm">
-                            Stop
-                          </button>
-                          <button
-                            className="btn btn-outline-danger btn-sm"
-                            onClick={() => deleteVM(vm.id, vm.name)}
-                            disabled={deletingVM === vm.id}
-                          >
-                            {deletingVM === vm.id ? (
-                              <>
-                                <span className="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
-                                Deleting...
-                              </>
+                  {vms.map((vm) => {
+                    const isRunning = vm.running !== false;
+                    return (
+                      <tr key={vm.id}>
+                        <td>
+                          <strong>{vm.name}</strong>
+                          <br />
+                          <small className="text-muted">ID: {vm.id}</small>
+                        </td>
+                        <td>
+                          <span className={`badge ${isRunning ? 'bg-success' : 'bg-secondary'}`}>
+                            {isRunning ? 'Running' : 'Stopped'}
+                          </span>
+                        </td>
+                        <td>
+                          <code>{vm.ssh_host ? `${vm.ssh_host}:${vm.ssh_port}` : 'Waiting for IP...'}</code>
+                        </td>
+                        <td>
+                          <code>{vm.pid}</code>
+                        </td>
+                        <td>
+                          <div className="btn-group" role="group">
+                            <button
+                              className="btn btn-outline-primary btn-sm"
+                              onClick={() => handleConnect(vm.name, vm.ssh_host, vm.ssh_port)}
+                              disabled={!vm.ssh_host || !isRunning}
+                              title={!isRunning ? 'VM is stopped' : vm.ssh_host ? `Open SSH terminal for ${vm.name} in new tab` : 'Waiting for IP address...'}
+                            >
+                              <i className="bi bi-terminal"></i> Connect
+                            </button>
+                            {isRunning ? (
+                              <button
+                                className="btn btn-outline-warning btn-sm"
+                                onClick={() => stopVM(vm.id)}
+                                disabled={stoppingVM === vm.id}
+                              >
+                                {stoppingVM === vm.id ? (
+                                  <>
+                                    <span className="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                                    Stopping...
+                                  </>
+                                ) : (
+                                  'Stop'
+                                )}
+                              </button>
                             ) : (
-                              'Delete'
+                              <button
+                                className="btn btn-outline-success btn-sm"
+                                onClick={() => startVM(vm.id)}
+                                disabled={startingVM === vm.id}
+                              >
+                                {startingVM === vm.id ? (
+                                  <>
+                                    <span className="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                                    Starting...
+                                  </>
+                                ) : (
+                                  'Start'
+                                )}
+                              </button>
                             )}
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                            <button
+                              className="btn btn-outline-danger btn-sm"
+                              onClick={() => deleteVM(vm.id, vm.name)}
+                              disabled={deletingVM === vm.id}
+                            >
+                              {deletingVM === vm.id ? (
+                                <>
+                                  <span className="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                                  Deleting...
+                                </>
+                              ) : (
+                                'Delete'
+                              )}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

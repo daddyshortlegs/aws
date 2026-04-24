@@ -35,6 +35,8 @@ export const config = {
     launchVM: '/launch-vm',
     listVMs: '/list-vms',
     deleteVM: '/delete-vm',
+    stopVM: '/stop-vm',
+    startVM: '/start-vm',
     launchVolume: '/launch-volume',
     listVolumes: '/list-volumes',
     deleteVolume: '/delete-volume',
