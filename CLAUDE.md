@@ -94,6 +94,17 @@ VM metadata is stored as JSON files (`{uuid}.json`) in the directory configured 
 
 All `vm_db` functions take an explicit `dir: &Path` parameter rather than reading from global config — pass the path from `Config::load()`.
 
+## Development Philosophy
+
+This project follows **Test Driven Development (TDD)**:
+
+- Write the test **before** the implementation
+- No new functions, handlers, or modules without corresponding tests
+- Tests live in a `#[cfg(test)]` block in the same file (Rust), alongside the source file (Go), or in a `*.test.ts` file (TypeScript)
+- If a function is hard to test directly (e.g. requires root or external binaries), extract the pure logic into a helper and test that
+
+TDD is not optional and should not need to be requested — it is the default way of working in this codebase.
+
 ## Deployment
 
 Deploys to `pc1` (10.0.0.1) via Ansible. Run `make all` from the repo root. Requires SSH access with password (`--ask-pass`) and sudo (`-K`). The `aws_base_path` on the server is `/home/andy/aws`.
