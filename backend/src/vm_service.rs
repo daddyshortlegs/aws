@@ -32,54 +32,14 @@ pub struct LaunchVmResponse {
 pub struct VmListEntry {
     pub id: String,
     pub name: String,
-    /// SSH host to connect to: "localhost" in user mode, "10.0.0.x" in bridge mode,
-    /// or empty string if the VM hasn't received a DHCP lease yet.
+    /// SSH host to connect to: "localhost" in user mode, empty in bridge mode
+    /// (the proxy resolves the IP from the dnsmasq lease file).
     pub ssh_host: String,
     pub ssh_port: u16,
     pub pid: u32,
-}
-
-fn parse_arp_output(output: &str, mac: &str) -> Option<String> {
-    // Parses "ip neigh show dev br0" output.
-    // Line format: "10.0.0.15 dev br0 lladdr 52:54:00:ab:cd:ef REACHABLE"
-    for line in output.lines() {
-        let parts: Vec<&str> = line.split_whitespace().collect();
-        if parts.len() >= 5 && parts[4].eq_ignore_ascii_case(mac) {
-            return Some(parts[0].to_string());
-        }
-    }
-    None
-}
-
-fn parse_lease_output(content: &str, mac: &str) -> Option<String> {
-    // Parses /var/lib/misc/dnsmasq.leases.
-    // Line format: "<expiry> <mac> <ip> <hostname> <client-id>"
-    for line in content.lines() {
-        let parts: Vec<&str> = line.split_whitespace().collect();
-        if parts.len() >= 3 && parts[1].eq_ignore_ascii_case(mac) {
-            return Some(parts[2].to_string());
-        }
-    }
-    None
-}
-
-async fn lookup_ip_by_mac(mac: &str) -> Option<String> {
-    // Prefer the dnsmasq lease file — it's populated immediately on DHCP grant,
-    // whereas ARP entries only appear after the host exchanges IP traffic with the VM.
-    const LEASE_FILE: &str = "/var/lib/misc/dnsmasq.leases";
-    if let Ok(content) = tokio::fs::read_to_string(LEASE_FILE).await {
-        if let Some(ip) = parse_lease_output(&content, mac) {
-            return Some(ip);
-        }
-    }
-
-    // Fall back to ARP table in case the lease file isn't available.
-    let output = tokio::process::Command::new("ip")
-        .args(["neigh", "show", "dev", "br0"])
-        .output()
-        .await
-        .ok()?;
-    parse_arp_output(&String::from_utf8_lossy(&output.stdout), mac)
+    /// MAC address included in bridge mode so the proxy can resolve the IP.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub mac_address: Option<String>,
 }
 
 pub async fn launch_vm(
@@ -201,18 +161,18 @@ async fn list_vms_response(dir: &Path, mode: &NetworkMode) -> axum::response::Re
                         ssh_host: "localhost".to_string(),
                         ssh_port: vm.ssh_port.unwrap_or(0),
                         pid: vm.pid,
+                        mac_address: None,
                     },
-                    NetworkMode::Bridge => {
-                        let mac = vm.mac_address.as_deref().unwrap_or("");
-                        let ip = lookup_ip_by_mac(mac).await.unwrap_or_default();
-                        VmListEntry {
-                            id: vm.id,
-                            name: vm.name,
-                            ssh_host: ip,
-                            ssh_port: 22,
-                            pid: vm.pid,
-                        }
-                    }
+                    NetworkMode::Bridge => VmListEntry {
+                        id: vm.id,
+                        name: vm.name,
+                        // Leave ssh_host empty; the proxy resolves it from the
+                        // dnsmasq lease file on the controller node.
+                        ssh_host: String::new(),
+                        ssh_port: 22,
+                        pid: vm.pid,
+                        mac_address: vm.mac_address.clone(),
+                    },
                 };
                 entries.push(entry);
             }
@@ -384,42 +344,29 @@ mod tests {
         assert_eq!(vms[0].ssh_port, 55000);
     }
 
-    #[test]
-    fn test_parse_lease_output() {
-        let content = "1234567890 52:54:00:ab:cd:ef 10.0.0.188 alpine-vm *\n\
-                       1234567891 52:54:00:11:22:33 10.0.0.189 alpine-vm2 *\n";
+    #[tokio::test]
+    async fn test_list_vms_response_bridge_mode_includes_mac_address() {
+        let dir = TempDir::new().unwrap();
+        let vm = VmInfo {
+            id: "abc-1".to_string(),
+            name: "my-vm".to_string(),
+            ssh_port: None,
+            mac_address: Some("52:54:00:ab:cd:ef".to_string()),
+            pid: 42,
+        };
+        store_vm_info(dir.path(), &vm).unwrap();
 
-        assert_eq!(
-            parse_lease_output(content, "52:54:00:ab:cd:ef"),
-            Some("10.0.0.188".to_string())
-        );
-        // Case-insensitive
-        assert_eq!(
-            parse_lease_output(content, "52:54:00:AB:CD:EF"),
-            Some("10.0.0.188".to_string())
-        );
-        assert_eq!(parse_lease_output(content, "52:54:00:ff:ff:ff"), None);
-    }
+        let resp = list_vms_response(dir.path(), &NetworkMode::Bridge).await;
+        assert_eq!(resp.status(), StatusCode::OK);
 
-    #[test]
-    fn test_parse_arp_output() {
-        let output = "10.0.0.15 dev br0 lladdr 52:54:00:ab:cd:ef REACHABLE\n\
-                      10.0.0.16 dev br0 lladdr 52:54:00:11:22:33 STALE\n";
-
-        assert_eq!(
-            parse_arp_output(output, "52:54:00:ab:cd:ef"),
-            Some("10.0.0.15".to_string())
-        );
-        assert_eq!(
-            parse_arp_output(output, "52:54:00:11:22:33"),
-            Some("10.0.0.16".to_string())
-        );
-        // Case-insensitive
-        assert_eq!(
-            parse_arp_output(output, "52:54:00:AB:CD:EF"),
-            Some("10.0.0.15".to_string())
-        );
-        assert_eq!(parse_arp_output(output, "52:54:00:ff:ff:ff"), None);
+        let body = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+        let vms: Vec<VmListEntry> = serde_json::from_slice(&body).unwrap();
+        assert_eq!(vms.len(), 1);
+        // MAC is passed through for the proxy to resolve.
+        assert_eq!(vms[0].mac_address.as_deref(), Some("52:54:00:ab:cd:ef"));
+        // ssh_host is left empty; the proxy fills it in.
+        assert_eq!(vms[0].ssh_host, "");
+        assert_eq!(vms[0].ssh_port, 22);
     }
 
     // ── delete_vm_response ───────────────────────────────────────────────────

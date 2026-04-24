@@ -1,10 +1,16 @@
 use std::env;
+use std::path::PathBuf;
 
 #[derive(Debug, Clone)]
 pub struct Config {
     pub listen_ip: String,
     pub proxy_port: u16,
     pub log_level: String,
+    /// Path to the JSON file where vm_id → backend_url mappings are persisted
+    /// across proxy restarts. Defaults to `./vm-backends.json`.
+    pub vm_backends_file: PathBuf,
+    /// Path to the dnsmasq lease file used to resolve VM MAC addresses to IPs.
+    pub lease_file: PathBuf,
 }
 
 impl Config {
@@ -15,11 +21,19 @@ impl Config {
             .parse()
             .unwrap_or(3000);
         let log_level = env::var("RUST_LOG").unwrap_or_else(|_| "info".into());
+        let vm_backends_file = env::var("VM_BACKENDS_FILE")
+            .map(PathBuf::from)
+            .unwrap_or_else(|_| PathBuf::from("./vm-backends.json"));
+        let lease_file = env::var("LEASE_FILE")
+            .map(PathBuf::from)
+            .unwrap_or_else(|_| PathBuf::from("/var/lib/misc/dnsmasq.leases"));
 
         Ok(Config {
             listen_ip,
             proxy_port,
             log_level,
+            vm_backends_file,
+            lease_file,
         })
     }
 }
@@ -80,5 +94,45 @@ mod tests {
         env::remove_var("PROXY_PORT");
         // parse() fails → unwrap_or(3000)
         assert_eq!(config.proxy_port, 3000);
+    }
+
+    #[test]
+    fn test_default_vm_backends_file() {
+        let _g = env_guard();
+        env::remove_var("VM_BACKENDS_FILE");
+        let config = Config::load().unwrap();
+        assert_eq!(config.vm_backends_file, PathBuf::from("./vm-backends.json"));
+    }
+
+    #[test]
+    fn test_default_lease_file() {
+        let _g = env_guard();
+        env::remove_var("LEASE_FILE");
+        let config = Config::load().unwrap();
+        assert_eq!(
+            config.lease_file,
+            PathBuf::from("/var/lib/misc/dnsmasq.leases")
+        );
+    }
+
+    #[test]
+    fn test_lease_file_from_env() {
+        let _g = env_guard();
+        env::set_var("LEASE_FILE", "/tmp/my.leases");
+        let config = Config::load().unwrap();
+        env::remove_var("LEASE_FILE");
+        assert_eq!(config.lease_file, PathBuf::from("/tmp/my.leases"));
+    }
+
+    #[test]
+    fn test_vm_backends_file_from_env() {
+        let _g = env_guard();
+        env::set_var("VM_BACKENDS_FILE", "/tmp/my-backends.json");
+        let config = Config::load().unwrap();
+        env::remove_var("VM_BACKENDS_FILE");
+        assert_eq!(
+            config.vm_backends_file,
+            PathBuf::from("/tmp/my-backends.json")
+        );
     }
 }

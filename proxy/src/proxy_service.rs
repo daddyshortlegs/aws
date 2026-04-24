@@ -7,22 +7,26 @@ use axum::{
 };
 use reqwest::Client;
 use std::collections::HashMap;
+use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::{error, info, warn};
 
+use crate::ip_lookup;
 use crate::registry::BackendRegistry;
 
 pub struct ProxyService {
     client: Client,
     registry: Arc<RwLock<BackendRegistry>>,
+    lease_file: PathBuf,
 }
 
 impl ProxyService {
-    pub fn new(registry: Arc<RwLock<BackendRegistry>>) -> Self {
+    pub fn new(registry: Arc<RwLock<BackendRegistry>>, lease_file: PathBuf) -> Self {
         Self {
             client: Client::new(),
             registry,
+            lease_file,
         }
     }
 
@@ -111,6 +115,22 @@ impl ProxyService {
                 }
                 Ok(Err(e)) => warn!("Backend request failed: {}", e),
                 Err(e) => warn!("Fan-out task panicked: {}", e),
+            }
+        }
+
+        // Resolve mac_address → ssh_host for VMs in bridge mode. The MAC is
+        // set by the backend; the proxy (which runs on the controller alongside
+        // dnsmasq) is the only node that can read the lease file reliably.
+        for vm in &mut merged {
+            if let Some(mac) = vm.get("mac_address").and_then(|v| v.as_str()) {
+                let mac = mac.to_string();
+                if !mac.is_empty() {
+                    if let Some(ip) = ip_lookup::lookup_ip_by_mac(&mac, &self.lease_file).await {
+                        if let Some(obj) = vm.as_object_mut() {
+                            obj.insert("ssh_host".to_string(), serde_json::Value::String(ip));
+                        }
+                    }
+                }
             }
         }
 
@@ -288,7 +308,10 @@ mod tests {
             Some(url) => BackendRegistry::with_url(url),
             None => BackendRegistry::new(),
         };
-        ProxyService::new(Arc::new(RwLock::new(registry)))
+        ProxyService::new(
+            Arc::new(RwLock::new(registry)),
+            std::path::PathBuf::from("/nonexistent/leases"),
+        )
     }
 
     fn service_for_port(port: u16) -> ProxyService {
@@ -733,7 +756,10 @@ mod tests {
     #[tokio::test]
     async fn test_backend_url_updated_dynamically() {
         let registry: Arc<RwLock<BackendRegistry>> = Arc::new(RwLock::new(BackendRegistry::new()));
-        let svc = ProxyService::new(Arc::clone(&registry));
+        let svc = ProxyService::new(
+            Arc::clone(&registry),
+            std::path::PathBuf::from("/nonexistent/leases"),
+        );
 
         // Before registration the proxy must refuse requests.
         let resp = svc
@@ -763,5 +789,78 @@ mod tests {
             .await
             .into_response();
         assert_eq!(resp.status(), StatusCode::OK);
+    }
+
+    // ── MAC → IP resolution ───────────────────────────────────────────────────
+
+    #[tokio::test]
+    async fn test_list_all_resolves_mac_address_to_ssh_host() {
+        use std::io::Write;
+
+        // Write a lease file with a known MAC→IP entry.
+        let mut lease_file = tempfile::NamedTempFile::new().unwrap();
+        writeln!(
+            lease_file,
+            "1234567890 52:54:00:ab:cd:ef 10.0.0.188 alpine-vm *"
+        )
+        .unwrap();
+
+        // Backend returns a VM with mac_address set and ssh_host empty.
+        let port = start_mock_backend(
+            200,
+            r#"[{"id":"vm-1","name":"test","ssh_host":"","ssh_port":22,"pid":42,"mac_address":"52:54:00:ab:cd:ef"}]"#,
+        )
+        .await;
+
+        let registry = BackendRegistry::with_url(format!("http://127.0.0.1:{port}"));
+        let svc = ProxyService::new(
+            Arc::new(RwLock::new(registry)),
+            lease_file.path().to_path_buf(),
+        );
+
+        let resp = svc
+            .list_all("/list-vms", HeaderMap::new())
+            .await
+            .into_response();
+
+        assert_eq!(resp.status(), StatusCode::OK);
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let vms: Vec<serde_json::Value> = serde_json::from_slice(&body).unwrap();
+        assert_eq!(vms.len(), 1);
+        assert_eq!(
+            vms[0]["ssh_host"].as_str(),
+            Some("10.0.0.188"),
+            "proxy should resolve mac_address to ssh_host via lease file"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_list_all_leaves_ssh_host_empty_when_mac_not_in_lease_file() {
+        let lease_file = tempfile::NamedTempFile::new().unwrap(); // empty lease file
+
+        let port = start_mock_backend(
+            200,
+            r#"[{"id":"vm-1","name":"test","ssh_host":"","ssh_port":22,"pid":42,"mac_address":"52:54:00:ff:ff:ff"}]"#,
+        )
+        .await;
+
+        let registry = BackendRegistry::with_url(format!("http://127.0.0.1:{port}"));
+        let svc = ProxyService::new(
+            Arc::new(RwLock::new(registry)),
+            lease_file.path().to_path_buf(),
+        );
+
+        let resp = svc
+            .list_all("/list-vms", HeaderMap::new())
+            .await
+            .into_response();
+
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let vms: Vec<serde_json::Value> = serde_json::from_slice(&body).unwrap();
+        assert_eq!(vms[0]["ssh_host"].as_str(), Some(""));
     }
 }

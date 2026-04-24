@@ -6,6 +6,8 @@
      ansible.builtin.file:
        path: "{{ aws_base_path }}/proxy"
        state: directory
+       owner: andy
+       group: andy
        mode: '0755'
 
    - name: Copy proxy binary

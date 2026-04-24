@@ -6,12 +6,15 @@ use axum::{
     routing::{delete, get, post},
     Router,
 };
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tower_http::cors::{Any, CorsLayer};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 mod config;
+mod ip_lookup;
 mod proxy_service;
 mod registry;
 
@@ -23,6 +26,30 @@ use registry::BackendRegistry;
 pub struct AppState {
     pub proxy_service: Arc<ProxyService>,
     pub registry: Arc<RwLock<BackendRegistry>>,
+    /// Path to the JSON file used to persist vm_id → backend_url across restarts.
+    pub vm_backends_file: PathBuf,
+}
+
+/// Load a vm_id → backend_url map from a JSON file. Returns an empty map if
+/// the file is absent or unreadable — this is normal on first startup.
+async fn load_vm_backends(path: &Path) -> HashMap<String, String> {
+    match tokio::fs::read_to_string(path).await {
+        Ok(content) => serde_json::from_str(&content).unwrap_or_default(),
+        Err(_) => HashMap::new(),
+    }
+}
+
+/// Persist the current vm_id → backend_url map to disk. Logs a warning on
+/// failure rather than propagating an error — a failed write is non-fatal.
+async fn save_vm_backends(path: &Path, backends: &HashMap<String, String>) {
+    match serde_json::to_string(backends) {
+        Ok(content) => {
+            if let Err(e) = tokio::fs::write(path, content).await {
+                tracing::warn!("Failed to persist vm_backends to {path:?}: {e}");
+            }
+        }
+        Err(e) => tracing::error!("Failed to serialize vm_backends: {e}"),
+    }
 }
 
 #[tokio::main]
@@ -37,10 +64,31 @@ async fn main() {
     tracing::info!("Starting proxy server with config: {:?}", config);
 
     let registry: Arc<RwLock<BackendRegistry>> = Arc::new(RwLock::new(BackendRegistry::new()));
-    let proxy_service = Arc::new(ProxyService::new(Arc::clone(&registry)));
+
+    // Restore vm_id → backend_url mappings saved before the last proxy restart.
+    let saved = load_vm_backends(&config.vm_backends_file).await;
+    let count = saved.len();
+    {
+        let mut reg = registry.write().await;
+        for (vm_id, backend_url) in saved {
+            reg.register_vm(vm_id, backend_url);
+        }
+    }
+    if count > 0 {
+        tracing::info!(
+            "Restored {count} VM-backend mapping(s) from {:?}",
+            config.vm_backends_file
+        );
+    }
+
+    let proxy_service = Arc::new(ProxyService::new(
+        Arc::clone(&registry),
+        config.lease_file.clone(),
+    ));
     let state = AppState {
         proxy_service,
         registry,
+        vm_backends_file: config.vm_backends_file.clone(),
     };
 
     let cors = CorsLayer::new()
@@ -111,6 +159,8 @@ async fn launch_vm_handler(
                     .write()
                     .await
                     .register_vm(vm_id.to_string(), backend_url);
+                let backends = state.registry.read().await.all_vm_backends();
+                save_vm_backends(&state.vm_backends_file, &backends).await;
             }
         }
         return Response::from_parts(parts, Body::from(bytes)).into_response();
@@ -156,7 +206,7 @@ async fn delete_vm_handler(
         None => return (StatusCode::NOT_FOUND, "Unknown VM ID").into_response(),
     };
 
-    state
+    let response = state
         .proxy_service
         .proxy_request_to(
             backend_url,
@@ -166,8 +216,15 @@ async fn delete_vm_handler(
             Some(Body::from(bytes)),
             None,
         )
-        .await
-        .into_response()
+        .await;
+
+    if response.status().is_success() {
+        state.registry.write().await.remove_vm(&vm_id);
+        let backends = state.registry.read().await.all_vm_backends();
+        save_vm_backends(&state.vm_backends_file, &backends).await;
+    }
+
+    response.into_response()
 }
 
 async fn proxy_handler(State(state): State<AppState>, request: Request<Body>) -> impl IntoResponse {
@@ -225,11 +282,24 @@ mod tests {
     }
 
     fn build_test_app() -> (Router, Arc<RwLock<BackendRegistry>>) {
+        // Use a unique temp path per call so parallel tests never share a file.
+        let vm_backends_file =
+            std::env::temp_dir().join(format!("test-vm-backends-{}.json", uuid::Uuid::new_v4()));
+        build_test_app_with_file(vm_backends_file)
+    }
+
+    fn build_test_app_with_file(
+        vm_backends_file: PathBuf,
+    ) -> (Router, Arc<RwLock<BackendRegistry>>) {
         let registry: Arc<RwLock<BackendRegistry>> = Arc::new(RwLock::new(BackendRegistry::new()));
-        let proxy_service = Arc::new(ProxyService::new(Arc::clone(&registry)));
+        let proxy_service = Arc::new(ProxyService::new(
+            Arc::clone(&registry),
+            PathBuf::from("/nonexistent/leases"),
+        ));
         let state = AppState {
             proxy_service,
             registry: Arc::clone(&registry),
+            vm_backends_file,
         };
 
         let cors = tower_http::cors::CorsLayer::new()
@@ -625,6 +695,133 @@ mod tests {
             *delete_count_b.lock().await,
             2,
             "backend B should have 2 hits (launch + delete)"
+        );
+    }
+
+    // ── persistence ───────────────────────────────────────────────────────────
+
+    #[tokio::test]
+    async fn test_load_vm_backends_missing_file_returns_empty() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let path = tmp.path().join("nonexistent.json");
+        let map = load_vm_backends(&path).await;
+        assert!(map.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_save_and_load_vm_backends_round_trips() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let path = tmp.path().join("backends.json");
+
+        let mut map = HashMap::new();
+        map.insert("vm-a".to_string(), "http://10.0.0.1:8081".to_string());
+        map.insert("vm-b".to_string(), "http://10.0.0.2:8082".to_string());
+
+        save_vm_backends(&path, &map).await;
+
+        let loaded = load_vm_backends(&path).await;
+        assert_eq!(loaded, map);
+    }
+
+    #[tokio::test]
+    async fn test_load_vm_backends_invalid_json_returns_empty() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let path = tmp.path().join("bad.json");
+        tokio::fs::write(&path, b"not valid json").await.unwrap();
+        let map = load_vm_backends(&path).await;
+        assert!(map.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_launch_vm_persists_mapping_to_file() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let backends_file = tmp.path().join("vm-backends.json");
+        let (app, _) = build_test_app_with_file(backends_file.clone());
+
+        // Start a mock backend that returns a successful launch response.
+        let port = start_mock_backend(200, r#"{"success":true,"instance_id":"vm-xyz"}"#).await;
+
+        app.clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/register")
+                    .header("content-type", "application/json")
+                    .body(Body::from(format!(r#"{{"ip":"127.0.0.1","port":{port}}}"#)))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        app.oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/launch-vm")
+                .header("content-type", "application/json")
+                .body(Body::from(r#"{"name":"test"}"#))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+        let persisted = load_vm_backends(&backends_file).await;
+        assert!(
+            persisted.contains_key("vm-xyz"),
+            "vm-xyz should be in the persisted file"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_delete_vm_removes_mapping_from_file() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let backends_file = tmp.path().join("vm-backends.json");
+        let (app, registry) = build_test_app_with_file(backends_file.clone());
+
+        // Pre-populate the registry and the file with a known mapping.
+        let port = start_mock_backend(200, "deleted").await;
+        registry.write().await.register_vm(
+            "vm-to-delete".to_string(),
+            format!("http://127.0.0.1:{port}"),
+        );
+
+        let mut initial = HashMap::new();
+        initial.insert(
+            "vm-to-delete".to_string(),
+            format!("http://127.0.0.1:{port}"),
+        );
+        save_vm_backends(&backends_file, &initial).await;
+
+        // Register the backend so the proxy can route to it.
+        app.clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/register")
+                    .header("content-type", "application/json")
+                    .body(Body::from(format!(r#"{{"ip":"127.0.0.1","port":{port}}}"#)))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .method("DELETE")
+                    .uri("/delete-vm")
+                    .header("content-type", "application/json")
+                    .body(Body::from(r#"{"id":"vm-to-delete"}"#))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(resp.status(), axum::http::StatusCode::OK);
+
+        let persisted = load_vm_backends(&backends_file).await;
+        assert!(
+            !persisted.contains_key("vm-to-delete"),
+            "vm-to-delete should be removed from the persisted file"
         );
     }
 }

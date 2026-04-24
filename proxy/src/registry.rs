@@ -78,6 +78,16 @@ impl BackendRegistry {
         self.vm_backends.get(vm_id).cloned()
     }
 
+    /// Remove the backend mapping for a VM (called after a successful delete).
+    pub fn remove_vm(&mut self, vm_id: &str) {
+        self.vm_backends.remove(vm_id);
+    }
+
+    /// Return a snapshot of all vm_id → backend_url mappings, for persistence.
+    pub fn all_vm_backends(&self) -> HashMap<String, String> {
+        self.vm_backends.clone()
+    }
+
     /// Test helper: create a registry pre-populated with a single known URL.
     #[cfg(test)]
     pub fn with_url(url: String) -> Self {
@@ -241,6 +251,44 @@ mod tests {
         assert_eq!(
             reg.backend_for_vm("vm-123").as_deref(),
             Some("http://10.0.0.1:8081")
+        );
+    }
+
+    #[test]
+    fn test_remove_vm_removes_mapping() {
+        let mut reg = BackendRegistry::new();
+        reg.register_vm("vm-123".to_string(), "http://10.0.0.1:8081".to_string());
+        reg.remove_vm("vm-123");
+        assert!(reg.backend_for_vm("vm-123").is_none());
+    }
+
+    #[test]
+    fn test_remove_vm_nonexistent_is_noop() {
+        let mut reg = BackendRegistry::new();
+        // Must not panic.
+        reg.remove_vm("does-not-exist");
+    }
+
+    #[test]
+    fn test_all_vm_backends_empty_returns_empty_map() {
+        let reg = BackendRegistry::new();
+        assert!(reg.all_vm_backends().is_empty());
+    }
+
+    #[test]
+    fn test_all_vm_backends_returns_all_entries() {
+        let mut reg = BackendRegistry::new();
+        reg.register_vm("vm-a".to_string(), "http://10.0.0.1:8081".to_string());
+        reg.register_vm("vm-b".to_string(), "http://10.0.0.2:8082".to_string());
+        let map = reg.all_vm_backends();
+        assert_eq!(map.len(), 2);
+        assert_eq!(
+            map.get("vm-a").map(String::as_str),
+            Some("http://10.0.0.1:8081")
+        );
+        assert_eq!(
+            map.get("vm-b").map(String::as_str),
+            Some("http://10.0.0.2:8082")
         );
     }
 
