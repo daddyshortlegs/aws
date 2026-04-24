@@ -9,6 +9,9 @@ pub struct Config {
     /// Path to the JSON file where vm_id → backend_url mappings are persisted
     /// across proxy restarts. Defaults to `./vm-backends.json`.
     pub vm_backends_file: PathBuf,
+    /// Path to the JSON file where volume_id → backend_url mappings are persisted
+    /// across proxy restarts. Defaults to `./volume-backends.json`.
+    pub volume_backends_file: PathBuf,
     /// Path to the dnsmasq lease file used to resolve VM MAC addresses to IPs.
     pub lease_file: PathBuf,
 }
@@ -24,6 +27,9 @@ impl Config {
         let vm_backends_file = env::var("VM_BACKENDS_FILE")
             .map(PathBuf::from)
             .unwrap_or_else(|_| PathBuf::from("./vm-backends.json"));
+        let volume_backends_file = env::var("VOLUME_BACKENDS_FILE")
+            .map(PathBuf::from)
+            .unwrap_or_else(|_| PathBuf::from("./volume-backends.json"));
         let lease_file = env::var("LEASE_FILE")
             .map(PathBuf::from)
             .unwrap_or_else(|_| PathBuf::from("/var/lib/misc/dnsmasq.leases"));
@@ -33,6 +39,7 @@ impl Config {
             proxy_port,
             log_level,
             vm_backends_file,
+            volume_backends_file,
             lease_file,
         })
     }
@@ -133,6 +140,29 @@ mod tests {
         assert_eq!(
             config.vm_backends_file,
             PathBuf::from("/tmp/my-backends.json")
+        );
+    }
+
+    #[test]
+    fn test_default_volume_backends_file() {
+        let _g = env_guard();
+        env::remove_var("VOLUME_BACKENDS_FILE");
+        let config = Config::load().unwrap();
+        assert_eq!(
+            config.volume_backends_file,
+            PathBuf::from("./volume-backends.json")
+        );
+    }
+
+    #[test]
+    fn test_volume_backends_file_from_env() {
+        let _g = env_guard();
+        env::set_var("VOLUME_BACKENDS_FILE", "/tmp/my-volume-backends.json");
+        let config = Config::load().unwrap();
+        env::remove_var("VOLUME_BACKENDS_FILE");
+        assert_eq!(
+            config.volume_backends_file,
+            PathBuf::from("/tmp/my-volume-backends.json")
         );
     }
 }

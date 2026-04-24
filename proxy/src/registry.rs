@@ -14,6 +14,8 @@ pub struct BackendRegistry {
     next_index: usize,
     /// Maps vm_id → backend_url so /delete-vm can route to the owning backend.
     vm_backends: HashMap<String, String>,
+    /// Maps volume_id → backend_url so volume operations route to the owning backend.
+    volume_backends: HashMap<String, String>,
 }
 
 impl BackendRegistry {
@@ -88,6 +90,26 @@ impl BackendRegistry {
         self.vm_backends.clone()
     }
 
+    /// Record which backend a volume was created on.
+    pub fn register_volume(&mut self, volume_id: String, backend_url: String) {
+        self.volume_backends.insert(volume_id, backend_url);
+    }
+
+    /// Look up the backend URL that owns a given volume.
+    pub fn backend_for_volume(&self, volume_id: &str) -> Option<String> {
+        self.volume_backends.get(volume_id).cloned()
+    }
+
+    /// Remove the backend mapping for a volume (called after a successful delete).
+    pub fn remove_volume(&mut self, volume_id: &str) {
+        self.volume_backends.remove(volume_id);
+    }
+
+    /// Return a snapshot of all volume_id → backend_url mappings, for persistence.
+    pub fn all_volume_backends(&self) -> HashMap<String, String> {
+        self.volume_backends.clone()
+    }
+
     /// Test helper: create a registry pre-populated with a single known URL.
     #[cfg(test)]
     pub fn with_url(url: String) -> Self {
@@ -102,14 +124,17 @@ impl BackendRegistry {
     }
 }
 
-#[derive(serde::Deserialize)]
+#[derive(serde::Deserialize, utoipa::ToSchema)]
 pub struct RegisterRequest {
+    /// IP address of the backend worker node.
     pub ip: String,
+    /// Port the backend is listening on.
     pub port: u16,
 }
 
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, utoipa::ToSchema)]
 pub struct RegisterResponse {
+    /// Unique ID assigned to this backend by the proxy.
     pub id: Uuid,
 }
 
@@ -292,6 +317,89 @@ mod tests {
         );
     }
 
+    // ── volume mapping ────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_register_volume_and_lookup() {
+        let mut reg = BackendRegistry::new();
+        reg.register_volume("vol-1".to_string(), "http://10.0.0.2:8081".to_string());
+        assert_eq!(
+            reg.backend_for_volume("vol-1").as_deref(),
+            Some("http://10.0.0.2:8081")
+        );
+    }
+
+    #[test]
+    fn test_backend_for_volume_unknown_returns_none() {
+        let reg = BackendRegistry::new();
+        assert!(reg.backend_for_volume("no-such-volume").is_none());
+    }
+
+    #[test]
+    fn test_remove_volume_removes_mapping() {
+        let mut reg = BackendRegistry::new();
+        reg.register_volume("vol-1".to_string(), "http://10.0.0.2:8081".to_string());
+        reg.remove_volume("vol-1");
+        assert!(reg.backend_for_volume("vol-1").is_none());
+    }
+
+    #[test]
+    fn test_remove_volume_nonexistent_is_noop() {
+        let mut reg = BackendRegistry::new();
+        // Must not panic.
+        reg.remove_volume("does-not-exist");
+    }
+
+    #[test]
+    fn test_all_volume_backends_empty_returns_empty_map() {
+        let reg = BackendRegistry::new();
+        assert!(reg.all_volume_backends().is_empty());
+    }
+
+    #[test]
+    fn test_all_volume_backends_returns_all_entries() {
+        let mut reg = BackendRegistry::new();
+        reg.register_volume("vol-a".to_string(), "http://10.0.0.1:8081".to_string());
+        reg.register_volume("vol-b".to_string(), "http://10.0.0.2:8082".to_string());
+        let map = reg.all_volume_backends();
+        assert_eq!(map.len(), 2);
+        assert_eq!(
+            map.get("vol-a").map(String::as_str),
+            Some("http://10.0.0.1:8081")
+        );
+        assert_eq!(
+            map.get("vol-b").map(String::as_str),
+            Some("http://10.0.0.2:8082")
+        );
+    }
+
+    #[test]
+    fn test_register_volume_overwrites_existing_mapping() {
+        let mut reg = BackendRegistry::new();
+        reg.register_volume("vol-1".to_string(), "http://10.0.0.1:8081".to_string());
+        reg.register_volume("vol-1".to_string(), "http://10.0.0.2:8082".to_string());
+        assert_eq!(
+            reg.backend_for_volume("vol-1").as_deref(),
+            Some("http://10.0.0.2:8082")
+        );
+    }
+
+    #[test]
+    fn test_vm_and_volume_backends_are_independent() {
+        let mut reg = BackendRegistry::new();
+        reg.register_vm("resource-1".to_string(), "http://10.0.0.1:8081".to_string());
+        reg.register_volume("resource-1".to_string(), "http://10.0.0.2:8082".to_string());
+        // Same key, different maps — must not interfere.
+        assert_eq!(
+            reg.backend_for_vm("resource-1").as_deref(),
+            Some("http://10.0.0.1:8081")
+        );
+        assert_eq!(
+            reg.backend_for_volume("resource-1").as_deref(),
+            Some("http://10.0.0.2:8082")
+        );
+    }
+
     #[test]
     fn test_register_vm_overwrites_existing_mapping() {
         let mut reg = BackendRegistry::new();
@@ -319,6 +427,15 @@ mod tests {
     }
 }
 
+#[utoipa::path(
+    post,
+    path = "/register",
+    request_body = RegisterRequest,
+    responses(
+        (status = 200, description = "Backend registered successfully", body = RegisterResponse),
+    ),
+    tag = "internal"
+)]
 pub async fn register_handler(
     axum::extract::State(state): axum::extract::State<crate::AppState>,
     axum::Json(body): axum::Json<RegisterRequest>,
