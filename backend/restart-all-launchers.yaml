@@ -1,0 +1,8 @@
+- name: Restart vm-launcher on all workers
+  become: yes
+  hosts: workers
+  tasks:
+    - name: Restart vm-launcher service
+      ansible.builtin.systemd:
+        name: vm-launcher
+        state: restarted
