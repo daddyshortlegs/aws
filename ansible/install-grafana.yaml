@@ -1,0 +1,56 @@
+- name: Install Grafana on controller
+  become: yes
+  hosts: controller
+  tasks:
+    - name: Install apt-transport-https and gnupg
+      ansible.builtin.apt:
+        name:
+          - apt-transport-https
+          - gnupg
+        state: present
+        update_cache: yes
+
+    - name: Create keyrings directory
+      ansible.builtin.file:
+        path: /etc/apt/keyrings
+        state: directory
+        mode: '0755'
+
+    - name: Add Grafana GPG key
+      ansible.builtin.get_url:
+        url: https://apt.grafana.com/gpg.key
+        dest: /etc/apt/keyrings/grafana.asc
+        mode: '0644'
+
+    - name: Add Grafana apt repository
+      ansible.builtin.apt_repository:
+        repo: "deb [signed-by=/etc/apt/keyrings/grafana.asc] https://apt.grafana.com stable main"
+        state: present
+        filename: grafana
+
+    - name: Install grafana
+      ansible.builtin.apt:
+        name: grafana
+        state: present
+        update_cache: yes
+
+    - name: Set Grafana HTTP port
+      ansible.builtin.ini_file:
+        path: /etc/grafana/grafana.ini
+        section: server
+        option: http_port
+        value: "3100"
+        mode: '0640'
+      notify: Restart grafana-server
+
+    - name: Enable and start grafana-server
+      ansible.builtin.systemd:
+        name: grafana-server
+        enabled: yes
+        state: started
+
+  handlers:
+    - name: Restart grafana-server
+      ansible.builtin.systemd:
+        name: grafana-server
+        state: restarted

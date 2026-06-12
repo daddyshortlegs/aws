@@ -1,0 +1,38 @@
+- name: Install Prometheus on controller
+  become: yes
+  hosts: controller
+  tasks:
+    - name: Install prometheus
+      ansible.builtin.apt:
+        name: prometheus
+        state: present
+        update_cache: yes
+
+    - name: Write prometheus config
+      ansible.builtin.copy:
+        content: |
+          global:
+            scrape_interval: 15s
+
+          scrape_configs:
+            - job_name: node
+              static_configs:
+                - targets:
+                  - 10.0.0.1:9100
+                  - 10.0.0.2:9100
+                  - 10.0.0.3:9100
+        dest: /etc/prometheus/prometheus.yml
+        mode: '0644'
+      notify: Restart prometheus
+
+  handlers:
+    - name: Restart prometheus
+      ansible.builtin.systemd:
+        name: prometheus
+        state: restarted
+
+    - name: Enable and start prometheus
+      ansible.builtin.systemd:
+        name: prometheus
+        enabled: yes
+        state: started
