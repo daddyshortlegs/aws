@@ -1,0 +1,7 @@
+# Orchestrator service configuration
+[orchestrator]
+backend_url = "http://127.0.0.1:8081"
+orchestrator_port = 8080
+
+[logging]
+level = "info"
