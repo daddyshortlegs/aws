@@ -3,6 +3,7 @@
 	audit audit-backend audit-orchestrator audit-frontend audit-node-ssh audit-terraform audit-cli \
 	dev run start stop \
 	deploy deploy-backend deploy-orchestrator deploy-frontend deploy-node-ssh \
+	install-node-exporter \
 	all clean
 
 # ── Audit ────────────────────────────────────────────────────────────────────
@@ -82,6 +83,10 @@ deploy: deploy-backend deploy-orchestrator deploy-frontend deploy-node-ssh
 
 # ── Build Linux binaries and deploy ──────────────────────────────────────────
 all: build-linux deploy
+
+# ── Infrastructure setup (run once per host) ─────────────────────────────────
+install-node-exporter:
+	ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -i inventory/nodes.yaml ansible/install-node-exporter.yaml -u andy -K --ask-pass
 
 # ── Clean ────────────────────────────────────────────────────────────────────
 clean:

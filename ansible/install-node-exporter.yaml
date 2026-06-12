@@ -1,0 +1,23 @@
+- name: Install node_exporter on all hosts
+  become: yes
+  hosts: cluster
+  tasks:
+    - name: Install prometheus-node-exporter
+      ansible.builtin.apt:
+        name: prometheus-node-exporter
+        state: present
+        update_cache: yes
+
+    - name: Create textfile collector directory
+      ansible.builtin.file:
+        path: /var/lib/prometheus/node-exporter
+        state: directory
+        owner: prometheus
+        group: prometheus
+        mode: '0755'
+
+    - name: Enable and start node_exporter service
+      ansible.builtin.systemd:
+        name: prometheus-node-exporter
+        enabled: yes
+        state: started
