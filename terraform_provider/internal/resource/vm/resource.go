@@ -42,7 +42,7 @@ func (r *vmResource) Metadata(_ context.Context, req resource.MetadataRequest, r
 
 func (r *vmResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "A VM managed by the VM launcher proxy API.",
+		Description: "A VM managed by the VM launcher orchestrator API.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description: "Instance ID (UUID) of the VM.",

@@ -1,6 +1,6 @@
 # andy-cli
 
-Command-line client for Andy's Web Services. Communicates with the proxy.
+Command-line client for Andy's Web Services. Communicates with the orchestrator.
 
 ## Build
 
@@ -14,9 +14,9 @@ The binary is at `target/release/andy-cli`.
 
 | Variable           | Description                  | Default                   |
 |--------------------|------------------------------|---------------------------|
-| `ANDYWS_ENDPOINT`  | Proxy base URL               | `http://127.0.0.1:8080`   |
+| `ANDYWS_ENDPOINT`  | Orchestrator base URL        | `http://127.0.0.1:8080`   |
 
-You can also pass `--proxy <url>` directly on the command line, which takes precedence over the environment variable.
+You can also pass `--orchestrator <url>` directly on the command line, which takes precedence over the environment variable.
 
 ## Usage
 

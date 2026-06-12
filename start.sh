@@ -1,9 +1,9 @@
 #!/bin/bash
 set -m
 
-cd proxy && cargo run &
+cd orchestrator && cargo run &
 PID=$!
-echo "Proxy running on PID: $PID"
+echo "Orchestrator running on PID: $PID"
 echo $PID >> services.pid
 
 cd backend && cargo run &

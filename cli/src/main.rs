@@ -6,14 +6,14 @@ mod cmd;
 #[derive(Parser)]
 #[command(name = "andy-cli", about = "CLI for Andy's Web Services")]
 struct Cli {
-    /// Proxy base URL
+    /// Orchestrator base URL
     #[arg(
         long,
         env = "ANDYWS_ENDPOINT",
         default_value = "http://127.0.0.1:8080",
         global = true
     )]
-    proxy: String,
+    orchestrator: String,
 
     /// Output raw JSON instead of formatted tables
     #[arg(long, global = true)]
@@ -40,7 +40,7 @@ enum Command {
 #[tokio::main]
 async fn main() {
     let cli = Cli::parse();
-    let client = client::Client::new(cli.proxy);
+    let client = client::Client::new(cli.orchestrator);
 
     let result = match cli.command {
         Command::Vm { action } => cmd::vm::run(action, &client, cli.json).await,

@@ -41,10 +41,10 @@ mod tests {
             }),
         );
 
-        let proxy_url = start_mock_server(app).await;
+        let orchestrator_url = start_mock_server(app).await;
         let backend_addr: SocketAddr = "127.0.0.1:8081".parse().unwrap();
 
-        register_with_proxy(&proxy_url, backend_addr).await;
+        register_with_orchestrator(&orchestrator_url, backend_addr).await;
 
         // Should have stopped after the first successful response
         assert_eq!(request_count.load(Ordering::SeqCst), 1);
@@ -66,10 +66,10 @@ mod tests {
             }),
         );
 
-        let proxy_url = start_mock_server(app).await;
+        let orchestrator_url = start_mock_server(app).await;
         let backend_addr: SocketAddr = "127.0.0.1:9999".parse().unwrap();
 
-        register_with_proxy(&proxy_url, backend_addr).await;
+        register_with_orchestrator(&orchestrator_url, backend_addr).await;
 
         let payload = captured.lock().await;
         let payload = payload.as_ref().expect("no request received");
@@ -99,26 +99,26 @@ mod tests {
             }),
         );
 
-        let proxy_url = start_mock_server(app).await;
+        let orchestrator_url = start_mock_server(app).await;
         let backend_addr: SocketAddr = "127.0.0.1:8081".parse().unwrap();
 
-        register_with_proxy(&proxy_url, backend_addr).await;
+        register_with_orchestrator(&orchestrator_url, backend_addr).await;
 
         // One failure + one success = two total requests
         assert_eq!(request_count.load(Ordering::SeqCst), 2);
     }
 }
 
-/// POST `{ "ip": <bound_ip>, "port": <bound_port> }` to `{proxy_url}/register`.
-/// Uses the actual bound address so the proxy can reach the backend regardless
+/// POST `{ "ip": <bound_ip>, "port": <bound_port> }` to `{orchestrator_url}/register`.
+/// Uses the actual bound address so the orchestrator can reach the backend regardless
 /// of which interface it is listening on.
 /// Retries with exponential backoff (up to 5 attempts) so the backend can
-/// start before the proxy is ready without failing fatally.
-pub async fn register_with_proxy(proxy_url: &str, bound_addr: SocketAddr) {
+/// start before the orchestrator is ready without failing fatally.
+pub async fn register_with_orchestrator(orchestrator_url: &str, bound_addr: SocketAddr) {
     let ip = bound_addr.ip().to_string();
     let port = bound_addr.port();
 
-    let url = format!("{proxy_url}/register");
+    let url = format!("{orchestrator_url}/register");
     let client = reqwest::Client::new();
     let payload = serde_json::json!({ "ip": ip, "port": port });
 
@@ -127,14 +127,14 @@ pub async fn register_with_proxy(proxy_url: &str, bound_addr: SocketAddr) {
         match client.post(&url).json(&payload).send().await {
             Ok(resp) if resp.status().is_success() => {
                 info!(
-                    "Registered with proxy at {} (ip={}, port={})",
-                    proxy_url, ip, port
+                    "Registered with orchestrator at {} (ip={}, port={})",
+                    orchestrator_url, ip, port
                 );
                 return;
             }
             Ok(resp) => {
                 warn!(
-                    "Registration attempt {}/5: proxy returned status {}",
+                    "Registration attempt {}/5: orchestrator returned status {}",
                     attempt,
                     resp.status()
                 );
@@ -151,7 +151,7 @@ pub async fn register_with_proxy(proxy_url: &str, bound_addr: SocketAddr) {
     }
 
     error!(
-        "Failed to register with proxy at {} after 5 attempts",
-        proxy_url
+        "Failed to register with orchestrator at {} after 5 attempts",
+        orchestrator_url
     );
 }

@@ -1,12 +1,12 @@
 # Terraform Provider aws2 (local use only)
 
-This provider manages VMs via your [VM launcher proxy](../proxy) API. It is intended for **local use only** (no registry publish).
+This provider manages VMs via your [VM launcher orchestrator](../orchestrator) API. It is intended for **local use only** (no registry publish).
 
 ## Prerequisites
 
 - [Go](https://go.dev/dl/) 1.21+
 - [Terraform](https://www.terraform.io/downloads) 1.0+
-- Proxy and backend running (proxy default: `http://127.0.0.1:8080`)
+- Orchestrator and backend running (orchestrator default: `http://127.0.0.1:8080`)
 
 ## Build the provider
 
@@ -35,7 +35,7 @@ The binary is named `terraform-provider-aws2` to match the provider source type 
 
    Alternatively set `TF_CLI_CONFIG_FILE` to the path of your copy of the example file.
 
-3. **Run the proxy** (and backend) so the API is available at e.g. `http://127.0.0.1:8080`.
+3. **Run the orchestrator** (and backend) so the API is available at e.g. `http://127.0.0.1:8080`.
 
 4. **From the examples directory:** When using dev_overrides, you can skip `terraform init` (Terraform will use the local binary directly). If you run `terraform init` anyway, clear cache first to avoid "hashicorp/vm" or localhost connection errors:
 
@@ -56,7 +56,7 @@ The binary is named `terraform-provider-aws2` to match the provider source type 
 
 | Argument         | Required | Default                 | Description                          |
 |------------------|----------|-------------------------|--------------------------------------|
-| `proxy_base_url` | No       | `http://127.0.0.1:8080` | Base URL of the VM launcher proxy.   |
+| `orchestrator_base_url` | No  | `http://127.0.0.1:8080` | Base URL of the VM launcher orchestrator. |
 
 ## Resource: `aws2_vm`
 
@@ -82,7 +82,7 @@ terraform {
 }
 
 provider "aws2" {
-  proxy_base_url = "http://127.0.0.1:8080"
+  orchestrator_base_url = "http://127.0.0.1:8080"
 }
 
 resource "aws2_vm" "my_vm" {

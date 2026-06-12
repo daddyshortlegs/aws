@@ -2,7 +2,7 @@
 # Run from this directory: terraform plan && terraform apply
 #
 # Prerequisites:
-# - Proxy running (e.g. http://127.0.0.1:8080)
+# - Orchestrator running (e.g. http://127.0.0.1:8080)
 # - Provider built: from terraform_provider/ run: make build
 # - CLI config: copy terraform_provider/terraform.rc.example to ~/.terraformrc
 #   (or set TF_CLI_CONFIG_FILE to its path) so Terraform finds the local provider.
@@ -17,8 +17,8 @@ terraform {
 }
 
 provider "aws2" {
-  # Optional: proxy URL (defaults to http://127.0.0.1:8080)
-  proxy_base_url = "http://127.0.0.1:8080"
+  # Optional: orchestrator URL (defaults to http://127.0.0.1:8080)
+  orchestrator_base_url = "http://10.0.0.1:8080"
 }
 
 #resource "aws2_vm" "andy1" {

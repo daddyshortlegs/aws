@@ -1,16 +1,16 @@
-.PHONY: build build-backend build-proxy build-frontend build-node-ssh build-cli \
-	build-linux build-linux-backend build-linux-proxy build-linux-cli \
-	audit audit-backend audit-proxy audit-frontend audit-node-ssh audit-terraform audit-cli \
+.PHONY: build build-backend build-orchestrator build-frontend build-node-ssh build-cli \
+	build-linux build-linux-backend build-linux-orchestrator build-linux-cli \
+	audit audit-backend audit-orchestrator audit-frontend audit-node-ssh audit-terraform audit-cli \
 	dev run start stop \
-	deploy deploy-backend deploy-proxy deploy-frontend deploy-node-ssh \
+	deploy deploy-backend deploy-orchestrator deploy-frontend deploy-node-ssh \
 	all clean
 
 # ── Audit ────────────────────────────────────────────────────────────────────
 audit-backend:
 	cd backend && $(MAKE) audit
 
-audit-proxy:
-	cd proxy && $(MAKE) audit
+audit-orchestrator:
+	cd orchestrator && $(MAKE) audit
 
 audit-frontend:
 	cd frontend && $(MAKE) audit
@@ -24,14 +24,14 @@ audit-terraform:
 audit-cli:
 	cd cli && $(MAKE) audit
 
-audit: audit-backend audit-proxy audit-frontend audit-node-ssh audit-terraform audit-cli
+audit: audit-backend audit-orchestrator audit-frontend audit-node-ssh audit-terraform audit-cli
 
 # ── Local / CI native build ──────────────────────────────────────────────────
 build-backend:
 	cd backend && $(MAKE) build
 
-build-proxy:
-	cd proxy && $(MAKE) build
+build-orchestrator:
+	cd orchestrator && $(MAKE) build
 
 build-frontend:
 	cd frontend && $(MAKE) build
@@ -42,19 +42,19 @@ build-node-ssh:
 build-cli:
 	cd cli && $(MAKE) build
 
-build: build-backend build-proxy build-frontend build-node-ssh build-cli
+build: build-backend build-orchestrator build-frontend build-node-ssh build-cli
 
 # ── Linux cross-compile (for deployment from Mac) ────────────────────────────
 build-linux-backend:
 	cd backend && $(MAKE) build-linux
 
-build-linux-proxy:
-	cd proxy && $(MAKE) build-linux
+build-linux-orchestrator:
+	cd orchestrator && $(MAKE) build-linux
 
 build-linux-cli:
 	cd cli && $(MAKE) build-linux
 
-build-linux: build-linux-backend build-linux-proxy build-linux-cli build-frontend build-node-ssh
+build-linux: build-linux-backend build-linux-orchestrator build-linux-cli build-frontend build-node-ssh
 
 # ── Local dev: run all services ──────────────────────────────────────────────
 start:
@@ -69,8 +69,8 @@ dev: build start
 deploy-backend:
 	cd backend && $(MAKE) deploy
 
-deploy-proxy:
-	cd proxy && $(MAKE) deploy
+deploy-orchestrator:
+	cd orchestrator && $(MAKE) deploy
 
 deploy-frontend:
 	cd frontend && $(MAKE) deploy
@@ -78,7 +78,7 @@ deploy-frontend:
 deploy-node-ssh:
 	cd node-ssh && $(MAKE) deploy
 
-deploy: deploy-backend deploy-proxy deploy-frontend deploy-node-ssh
+deploy: deploy-backend deploy-orchestrator deploy-frontend deploy-node-ssh
 
 # ── Build Linux binaries and deploy ──────────────────────────────────────────
 all: build-linux deploy
@@ -86,7 +86,7 @@ all: build-linux deploy
 # ── Clean ────────────────────────────────────────────────────────────────────
 clean:
 	cd backend && $(MAKE) clean 2>/dev/null || true
-	cd proxy && $(MAKE) clean 2>/dev/null || true
+	cd orchestrator && $(MAKE) clean 2>/dev/null || true
 	cd cli && $(MAKE) clean 2>/dev/null || true
 	cd frontend && $(MAKE) clean 2>/dev/null || true
 	cd node-ssh && $(MAKE) clean 2>/dev/null || true

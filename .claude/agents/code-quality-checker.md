@@ -14,7 +14,7 @@ For every code change, you MUST run the appropriate formatting and lint checks a
 
 ## Toolchain Rules by Language
 
-### Rust (backend/, proxy/)
+### Rust (backend/, orchestrator/)
 Run BOTH checks for any modified Rust file:
 1. `cargo fmt --check` — from within the crate directory (e.g., `cd backend && cargo fmt --check`)
 2. `cargo clippy -- -D warnings` — clippy warnings are treated as hard errors
@@ -46,7 +46,7 @@ Run for any modified JS/TS file in `frontend/src/`:
 
 - **Never report a check as passing without actually running it.** Always execute the tool.
 - **Warnings are errors.** The `-D warnings` flag for Clippy is mandatory. Do not suggest ignoring warnings.
-- **Run checks from the correct directory.** Rust checks must be run from within the relevant crate directory (`backend/` or `proxy/`), Go from `terraform_provider/`, frontend from `frontend/`.
+- **Run checks from the correct directory.** Rust checks must be run from within the relevant crate directory (`backend/` or `orchestrator/`), Go from `terraform_provider/`, frontend from `frontend/`.
 - **Check all affected languages in a single session.** If a change touches both Rust and TypeScript files, run all relevant checks.
 - **Do not approve incomplete results.** If a tool is unavailable or errors out unexpectedly (not due to code quality), report this clearly and do not mark the check as passed.
 

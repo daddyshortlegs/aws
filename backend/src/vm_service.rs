@@ -35,11 +35,11 @@ pub struct VmListEntry {
     pub id: String,
     pub name: String,
     /// SSH host to connect to: "localhost" in user mode, empty in bridge mode
-    /// (the proxy resolves the IP from the dnsmasq lease file).
+    /// (the orchestrator resolves the IP from the dnsmasq lease file).
     pub ssh_host: String,
     pub ssh_port: u16,
     pub pid: u32,
-    /// MAC address included in bridge mode so the proxy can resolve the IP.
+    /// MAC address included in bridge mode so the orchestrator can resolve the IP.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub mac_address: Option<String>,
     /// Whether the QEMU process is currently alive.
@@ -188,7 +188,7 @@ async fn list_vms_response(dir: &Path, mode: &NetworkMode) -> axum::response::Re
                         running: is_process_running(vm.pid),
                         id: vm.id,
                         name: vm.name,
-                        // Leave ssh_host empty; the proxy resolves it from the
+                        // Leave ssh_host empty; the orchestrator resolves it from the
                         // dnsmasq lease file on the controller node.
                         ssh_host: String::new(),
                         ssh_port: 22,
@@ -500,9 +500,9 @@ mod tests {
         let body = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
         let vms: Vec<VmListEntry> = serde_json::from_slice(&body).unwrap();
         assert_eq!(vms.len(), 1);
-        // MAC is passed through for the proxy to resolve.
+        // MAC is passed through for the orchestrator to resolve.
         assert_eq!(vms[0].mac_address.as_deref(), Some("52:54:00:ab:cd:ef"));
-        // ssh_host is left empty; the proxy fills it in.
+        // ssh_host is left empty; the orchestrator fills it in.
         assert_eq!(vms[0].ssh_host, "");
         assert_eq!(vms[0].ssh_port, 22);
     }

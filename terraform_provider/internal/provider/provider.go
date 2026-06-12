@@ -13,14 +13,14 @@ import (
 	"github.com/terraform-provider-vm-launcher/local/internal/resource/vm"
 )
 
-const defaultProxyURL = "http://127.0.0.1:8080"
+const defaultOrchestratorURL = "http://127.0.0.1:8080"
 
 var _ provider.Provider = (*vmLauncherProvider)(nil)
 
 type vmLauncherProvider struct{}
 
 type vmLauncherProviderModel struct {
-	ProxyBaseURL types.String `tfsdk:"proxy_base_url"`
+	OrchestratorBaseURL types.String `tfsdk:"orchestrator_base_url"`
 }
 
 func New() provider.Provider {
@@ -34,9 +34,9 @@ func (p *vmLauncherProvider) Metadata(_ context.Context, _ provider.MetadataRequ
 func (p *vmLauncherProvider) Schema(_ context.Context, _ provider.SchemaRequest, resp *provider.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Attributes: map[string]schema.Attribute{
-			"proxy_base_url": schema.StringAttribute{
+			"orchestrator_base_url": schema.StringAttribute{
 				Optional:    true,
-				Description: "Base URL of the VM launcher proxy (e.g. http://127.0.0.1:8080). Defaults to http://127.0.0.1:8080.",
+				Description: "Base URL of the VM launcher orchestrator (e.g. http://127.0.0.1:8080). Defaults to http://127.0.0.1:8080.",
 			},
 		},
 	}
@@ -50,17 +50,17 @@ func (p *vmLauncherProvider) Configure(ctx context.Context, req provider.Configu
 		return
 	}
 
-	baseURL := defaultProxyURL
-	if !config.ProxyBaseURL.IsNull() && !config.ProxyBaseURL.IsUnknown() && config.ProxyBaseURL.ValueString() != "" {
-		baseURL = config.ProxyBaseURL.ValueString()
+	baseURL := defaultOrchestratorURL
+	if !config.OrchestratorBaseURL.IsNull() && !config.OrchestratorBaseURL.IsUnknown() && config.OrchestratorBaseURL.ValueString() != "" {
+		baseURL = config.OrchestratorBaseURL.ValueString()
 	}
 
 	// Validate format
 	if baseURL == "" {
 		resp.Diagnostics.AddAttributeError(
-			path.Root("proxy_base_url"),
-			"Invalid proxy_base_url",
-			"proxy_base_url must be a non-empty URL (e.g. http://127.0.0.1:8080)",
+			path.Root("orchestrator_base_url"),
+			"Invalid orchestrator_base_url",
+			"orchestrator_base_url must be a non-empty URL (e.g. http://127.0.0.1:8080)",
 		)
 		return
 	}

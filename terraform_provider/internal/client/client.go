@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-// Client talks to the VM launcher proxy API.
+// Client talks to the VM launcher orchestrator API.
 type Client struct {
 	BaseURL    string
 	HTTPClient *http.Client
@@ -45,7 +45,7 @@ type DeleteVMRequest struct {
 	ID string `json:"id"`
 }
 
-// NewClient returns a client for the given proxy base URL (e.g. http://127.0.0.1:8080).
+// NewClient returns a client for the given orchestrator base URL (e.g. http://127.0.0.1:8080).
 func NewClient(baseURL string) *Client {
 	baseURL = strings.TrimSuffix(baseURL, "/")
 	return &Client{

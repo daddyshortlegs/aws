@@ -10,7 +10,7 @@ export const config = {
   // Get the full backend URL.
   // In production (no REACT_APP_BACKEND_HOST set) use a relative /api path so
   // requests stay on the same origin and are proxied by nginx — no CORS needed.
-  // In local dev set REACT_APP_BACKEND_HOST=127.0.0.1 to hit the proxy directly.
+  // In local dev set REACT_APP_BACKEND_HOST=127.0.0.1 to hit the orchestrator directly.
   getBackendUrl: (endpoint: string = '') => {
     if (process.env.REACT_APP_BACKEND_HOST) {
       const { protocol, host, port } = config.backend;

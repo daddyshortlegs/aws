@@ -27,18 +27,18 @@ repos:
         files: ^backend/.*\.rs$
         pass_filenames: false
 
-      - id: cargo-fmt-proxy
-        name: cargo fmt (proxy)
-        entry: cargo fmt --manifest-path proxy/Cargo.toml -- --check
+      - id: cargo-fmt-orchestrator
+        name: cargo fmt (orchestrator)
+        entry: cargo fmt --manifest-path orchestrator/Cargo.toml -- --check
         language: system
-        files: ^proxy/.*\.rs$
+        files: ^orchestrator/.*\.rs$
         pass_filenames: false
 
-      - id: cargo-clippy-proxy
-        name: cargo clippy (proxy)
-        entry: cargo clippy --manifest-path proxy/Cargo.toml -- -D warnings
+      - id: cargo-clippy-orchestrator
+        name: cargo clippy (orchestrator)
+        entry: cargo clippy --manifest-path orchestrator/Cargo.toml -- -D warnings
         language: system
-        files: ^proxy/.*\.rs$
+        files: ^orchestrator/.*\.rs$
         pass_filenames: false
 
   # ── Go ─────────────────────────────────────────────────────────────────────

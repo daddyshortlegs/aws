@@ -22,7 +22,7 @@ Per-component builds (run from the component directory or via root):
 | Component | Build | Test | Run (dev) |
 |-----------|-------|------|-----------|
 | backend (Rust) | `cargo build --release` | `cargo test` | `cargo run` |
-| proxy (Rust) | `cargo build --release` | `cargo test` | `cargo run` |
+| orchestrator (Rust) | `cargo build --release` | `cargo test` | `cargo run` |
 | frontend (React/TS) | `npm run build` | `npm test` | `npm start` |
 | node-ssh (Node.js) | `npm install` | — | `npm start` |
 | terraform_provider (Go) | `go build -o terraform-provider-aws2 .` | `go test ./...` | — |
@@ -65,11 +65,11 @@ Fix any issues before stopping. Clippy warnings are treated as errors (`-D warni
 
 ```
 Browser → nginx (port 80, production)
-              ├── /api/*  → proxy (8080) → backend (8081)
+              ├── /api/*  → orchestrator (8080) → backend (8081)
               └── /       → static React build
 
 Browser → React dev server (port 3000, local dev)
-              └── direct → proxy (8080) → backend (8081)
+              └── direct → orchestrator (8080) → backend (8081)
 
 Browser → node-ssh (port 3001, WebSocket)
               └── spawns ssh process via node-pty to VM SSH port
@@ -78,10 +78,10 @@ Browser → node-ssh (port 3001, WebSocket)
 ### Component Roles
 
 - **backend** (`backend/`): Rust/Axum. Core VM API. Launches VMs with QEMU (copying `alpine.qcow2` as the base image), assigns a random SSH port (49152–65535), persists VM metadata as JSON files, and restarts all persisted VMs on startup.
-- **proxy** (`proxy/`): Rust/Axum. Thin HTTP proxy that forwards all requests to the backend. Exists to provide a single network ingress point.
-- **frontend** (`frontend/`): React 18 + TypeScript + Bootstrap 5 (CRA). Communicates with the proxy; in production uses relative `/api` path (nginx-proxied), in local dev targets `127.0.0.1:8080` via `.env.development`.
+- **orchestrator** (`orchestrator/`): Rust/Axum. Routes and load-balances requests across registered backend workers, resolves VM IPs in bridge mode, and persists VM-to-backend mappings across restarts.
+- **frontend** (`frontend/`): React 18 + TypeScript + Bootstrap 5 (CRA). Communicates with the orchestrator; in production uses relative `/api` path (nginx-proxied), in local dev targets `127.0.0.1:8080` via `.env.development`.
 - **node-ssh** (`node-ssh/`): Node.js WebSocket server. Accepts WebSocket connections with `?host=&port=&user=` query params and spawns an SSH process via `node-pty`.
-- **terraform_provider** (`terraform_provider/`): Go Terraform provider (`aws2`). Wraps the proxy API to manage VMs as Terraform resources. Defaults to `http://127.0.0.1:8080`.
+- **terraform_provider** (`terraform_provider/`): Go Terraform provider (`aws2`). Wraps the orchestrator API to manage VMs as Terraform resources. Defaults to `http://127.0.0.1:8080`.
 - **RAG** (`RAG/`): Python RAG server. Deployed separately via Ansible; no local build step.
 
 ### VM Storage (backend)

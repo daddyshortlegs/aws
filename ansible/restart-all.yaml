@@ -17,11 +17,11 @@
         name: node-ssh
         state: restarted
 
-- name: Restart proxy on controller
+- name: Restart orchestrator on controller
   become: yes
   hosts: controller
   tasks:
-    - name: Restart proxy service
+    - name: Restart orchestrator service
       ansible.builtin.systemd:
-        name: proxy
+        name: orchestrator
         state: restarted

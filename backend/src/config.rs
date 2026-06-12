@@ -20,7 +20,7 @@ pub enum NetworkMode {
 pub struct Config {
     pub listen_ip: String,
     pub listen_port: u16,
-    pub proxy_url: String,
+    pub orchestrator_url: String,
     pub storage: StorageConfig,
     #[serde(default)]
     pub network_mode: NetworkMode,

@@ -60,10 +60,10 @@ async fn main() {
     let bound_addr = listener.local_addr().unwrap();
     tracing::info!("listening on {}", bound_addr);
 
-    // Announce ourselves to the proxy asynchronously so startup is not blocked
-    let proxy_url = config.proxy_url.clone();
+    // Announce ourselves to the orchestrator asynchronously so startup is not blocked
+    let orchestrator_url = config.orchestrator_url.clone();
     tokio::spawn(async move {
-        register::register_with_proxy(&proxy_url, bound_addr).await;
+        register::register_with_orchestrator(&orchestrator_url, bound_addr).await;
     });
 
     axum::serve(listener, app).await.unwrap();

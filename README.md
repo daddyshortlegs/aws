@@ -8,7 +8,7 @@ The VM Orchestrator consists of several interconnected components:
 
 ```
 ┌─────────────┐    ┌─────────────┐    ┌─────────────┐
-│   Frontend  │◄──►│    Proxy    │◄──►│   Backend   │
+│   Frontend  │◄──►│Orchestrator │◄──►│   Backend   │
 │  (Port 3000)│    │ (Port 8080) │    │(Port 8081)  │
 └─────────────┘    └─────────────┘    └─────────────┘
        │                   │                   │
@@ -32,10 +32,10 @@ The VM Orchestrator consists of several interconnected components:
 - **Technology**: Rust, Axum, Tokio
 - **Purpose**: Core VM management API and WebSocket handling
 
-### 3. Proxy (Rust + Axum)
+### 3. Orchestrator (Rust + Axum)
 - **Port**: 8080 (configurable)
 - **Technology**: Rust, Axum, Reqwest
-- **Purpose**: HTTP proxy that forwards API requests to the backend
+- **Purpose**: Routes and load-balances API requests across registered backend workers
 
 
 ### 4. SSH WebSocket Server (Node.js)
